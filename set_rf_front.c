@@ -1,14 +1,23 @@
 #include "common.h"
 
-void set_RF_front_orig(uint32_t freq_KHz)
+/* WARNING: Enum "anon_enum_32": Some values do not have unique names */
+/* WARNING: Enum "sony_ascot3_tv_system_t": Some values do not have unique names */
+/* WARNING: Enum "sony_helene_tv_system_t": Some values do not have unique names */
+
+void _mt_fe_tn_set_RF_front_tc6800_cxd2856(uint32_t freq_KHz)
+
 {
   bool bVar1;
   bool bVar2;
-  unsigned extraout_r0 = freq_KHz;
-  uint8_t bVar3;
+  uint extraout_r0 = freq_KHz;
+  byte bVar3;
   uint8_t uVar4;
-  uint8_t local_21 [5];
+  byte local_21 [5];
   
+                    /* Unresolved local var: uint32_t fl@[???]
+                       Unresolved local var: uint32_t fm@[???]
+                       Unresolved local var: uint8_t buf2@[???] */
+  __gnu_mcount_nc();
   if (TC6800_tuner_cfg_cxd2856.tuner_int_im == 0x0) {
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x88,0x27);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x89,0x2b);
@@ -19,7 +28,7 @@ LAB_0008a8bc:
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x39,0x69);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x3a,0x12);
 LAB_0008a694:
-    if (1 < (unsigned)TC6800_tuner_cfg_cxd2856.tuner_mode - 1) goto LAB_0008a6a4;
+    if (1 < (uint)TC6800_tuner_cfg_cxd2856.tuner_mode - 1) goto LAB_0008a6a4;
 LAB_0008a7d8:
     if (TC6800_tuner_cfg_cxd2856.tuner_int_lt < 2) goto LAB_0008a6a4;
     if (TC6800_tuner_cfg_cxd2856.tuner_int_im == 0x2) {
@@ -68,7 +77,7 @@ LAB_0008a6d8:
     local_21[0] = 0x11;
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x39,0x69);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x3a,0x9);
-    if ((unsigned)TC6800_tuner_cfg_cxd2856.tuner_mode - 1 < 2) goto LAB_0008a7d8;
+    if ((uint)TC6800_tuner_cfg_cxd2856.tuner_mode - 1 < 2) goto LAB_0008a7d8;
 LAB_0008a6a4:
     bVar3 = local_21[0];
     if (TC6800_tuner_cfg_cxd2856.tuner_custom_cfg == 1) {
@@ -98,7 +107,7 @@ LAB_0008a70c:
   }
   _mt_fe_tn_set_reg_tc6800_cxd2856(0xaa,uVar4);
   _mt_fe_tn_set_reg_tc6800_cxd2856(0xa9,0xf6);
-  if ((unsigned)TC6800_tuner_cfg_cxd2856.tuner_application - 3 < 2) {
+  if ((uint)TC6800_tuner_cfg_cxd2856.tuner_application - 3 < 2) {
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x98,0xf7);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x99,0xa5);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x26,0x14);
@@ -274,7 +283,7 @@ int main() {
     for (uint32_t freq = 0; freq < 1000000; freq++) {
         init();
         printf("freq: %d\n", freq);
-        set_RF_front_orig(freq);
+        _mt_fe_tn_set_RF_front_tc6800_cxd2856(freq);
         m88tc6800_set_rf_frontend(&priv, freq);
         finish();
     }

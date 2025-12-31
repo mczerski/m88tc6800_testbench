@@ -41,6 +41,7 @@ LAB_0008b808:
 }
 
 void _mt_fe_tn_set_Mixer_tc6800_cxd2856(uint32_t freq_KHz,uint8_t mixer_sel)
+
 {
   uint extraout_r0 = freq_KHz;
   uint8_t uVar1;

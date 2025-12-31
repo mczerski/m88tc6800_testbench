@@ -295,7 +295,7 @@ void _mt_fe_tn_set_PLL_freq_tc6800_cxd2856(void)
   bool bVar16;
   uint uVar17;
   byte local_38;
-
+  
                     /* Unresolved local var: uint32_t LDIV@[???]
                        Unresolved local var: uint32_t Fvco_KHz@[???]
                        Unresolved local var: uint32_t Fvco_in_KHz@[???]

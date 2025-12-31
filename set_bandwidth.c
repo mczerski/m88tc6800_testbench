@@ -7,7 +7,7 @@ void _mt_fe_tn_set_BB_tc6800_cxd2856(void)
   
                     /* Unresolved local var: uint32_t bandwidth@[???] */
   __gnu_mcount_nc();
-  if (TC6800_tuner_cfg_cxd2856.tuner_bandwidth == 0x6a4) {
+  if (TC6800_tuner_cfg_cxd2856.tuner_bandwidth == 1700) {
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x59,0x9);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x29,0xae);
     _mt_fe_tn_set_reg_tc6800_cxd2856(0x86,0x3c);
