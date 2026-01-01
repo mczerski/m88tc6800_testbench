@@ -278,6 +278,20 @@ void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz)
     }
 }
 
+static u8 m88tc6800_get_mixer_type(u32 freq_khz)
+{
+    if (freq_khz <= 334000) {
+        return 2;
+    }
+    if ((freq_khz >= 480000 && freq_khz <= 492000) ||
+           (freq_khz >= 610000 && freq_khz <= 624000) ||
+           (freq_khz >= 800000 && freq_khz <= 820000) ||
+           (freq_khz >= 366000 && freq_khz <= 374000)) {
+        return 3;
+    }
+    return 1;
+}
+
 void m88tc6800_set_mixer(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type)
 {
     u8 tmp = mixer_type;
@@ -412,34 +426,6 @@ void m88tc6800_set_lo(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type)
         m88tc6800_set_reg_bits(priv, 0x13, 7, 3, 5);
     }
     m88tc6800_write_reg(priv, 0x14, reg_data);
-}
-
-void m88tc6800_set_tune(struct m88tc6800_priv *priv, uint32_t freq_khz, uint8_t mixer_type, uint32_t wait_time)
-{
-  m88tc6800_write_reg(priv, 0x04, 0x7f);
-  m88tc6800_write_reg(priv, 0x05, 0xf8);
-  m88tc6800_preset(priv);
-  m88tc6800_set_rf_frontend(priv, freq_khz);
-  m88tc6800_set_mixer(priv, freq_khz, 1);
-  m88tc6800_set_lo(priv, freq_khz, 1);
-  m88tc6800_set_pll(priv);
-  m88tc6800_set_bandwidth(priv);
-  m88tc6800_write_reg(priv, 0x04, 0x00);
-  m88tc6800_write_reg(priv, 0x05, 0x00);
-  m88tc6800_set_dac(priv, freq_khz);
-  m88tc6800_write_reg(priv, 0x40, 0x1a);
-  m88tc6800_write_reg(priv, 0x41, 0x00);
-  m88tc6800_write_reg(priv, 0x44, 0x22);
-  m88tc6800_write_reg(priv, 0x60, 0x34);
-  m88tc6800_write_reg(priv, 0x05, 0x04);
-  m88tc6800_write_reg(priv, 0xc2, 0x01);
-  m88tc6800_write_reg(priv, 0x00, 0x01);
-  m88tc6800_write_reg(priv, 0x00, 0x00);
-  m88tc6800_write_reg(priv, 0xc2, 0x00);
-  m88tc6800_write_reg(priv, 0x05, 0x00);
-  m88tc6800_write_reg(priv, 0x39, 0x00);
-  m88tc6800_write_reg(priv, 0x3a, 0x00);
-  //sony_sleep(ms);
 }
 
 void m88tc6800_set_pll(struct m88tc6800_priv *priv)
@@ -856,21 +842,35 @@ LAB_0008a048:
   m88tc6800_write_reg(priv, 0xf4,(uint8_t)iVar2);
 }
 
-static u8 m88tc6800_get_mixer_type(u32 freq_khz)
+void m88tc6800_set_tune(struct m88tc6800_priv *priv, uint32_t freq_khz, uint8_t mixer_type, uint32_t wait_time)
 {
-    if (freq_khz <= 334000) {
-        return 2;
-    }
-    if ((freq_khz >= 480000 && freq_khz <= 492000) ||
-           (freq_khz >= 610000 && freq_khz <= 624000) ||
-           (freq_khz >= 800000 && freq_khz <= 820000) ||
-           (freq_khz >= 366000 && freq_khz <= 374000)) {
-        return 3;
-    }
-    return 1;
+  m88tc6800_write_reg(priv, 0x04, 0x7f);
+  m88tc6800_write_reg(priv, 0x05, 0xf8);
+  m88tc6800_preset(priv);
+  m88tc6800_set_rf_frontend(priv, freq_khz);
+  m88tc6800_set_mixer(priv, freq_khz, 1);
+  m88tc6800_set_lo(priv, freq_khz, 1);
+  m88tc6800_set_pll(priv);
+  m88tc6800_set_bandwidth(priv);
+  m88tc6800_write_reg(priv, 0x04, 0x00);
+  m88tc6800_write_reg(priv, 0x05, 0x00);
+  m88tc6800_set_dac(priv, freq_khz);
+  m88tc6800_write_reg(priv, 0x40, 0x1a);
+  m88tc6800_write_reg(priv, 0x41, 0x00);
+  m88tc6800_write_reg(priv, 0x44, 0x22);
+  m88tc6800_write_reg(priv, 0x60, 0x34);
+  m88tc6800_write_reg(priv, 0x05, 0x04);
+  m88tc6800_write_reg(priv, 0xc2, 0x01);
+  m88tc6800_write_reg(priv, 0x00, 0x01);
+  m88tc6800_write_reg(priv, 0x00, 0x00);
+  m88tc6800_write_reg(priv, 0xc2, 0x00);
+  m88tc6800_write_reg(priv, 0x05, 0x00);
+  m88tc6800_write_reg(priv, 0x39, 0x00);
+  m88tc6800_write_reg(priv, 0x3a, 0x00);
+  //sony_sleep(ms);
 }
 
-void m88tc6800_set_poweron(struct m88tc6800_priv *priv, uint32_t wait_time)
+void m88tc6800_set_poweron(struct m88tc6800_priv *priv, uint32_t wait_time_ms)
 {
     u8 reg_data;
     char cVar8;
@@ -1006,7 +1006,7 @@ void m88tc6800_set_poweron(struct m88tc6800_priv *priv, uint32_t wait_time)
     m88tc6800_write_reg(priv, 0x4e, 0x5);
     m88tc6800_write_reg(priv, 0x4f, 0x80);
     m88tc6800_write_reg(priv, 0x45, 0x5d);
-    m88tc6800_set_tune(priv, 0xf37ff, 0x32, wait_time);
+    m88tc6800_set_tune(priv, 0xf37ff, 0x32, wait_time_ms);
     m88tc6800_write_reg(priv, 0x14, 0x7b);
     m88tc6800_write_reg(priv, 0x12, 0x1e);
     m88tc6800_set_reg_bits(priv, 0xbd, 0x1, 0x4, 0x4);
@@ -1060,7 +1060,7 @@ void m88tc6800_set_poweron(struct m88tc6800_priv *priv, uint32_t wait_time)
     else if (priv->config.xtal == 27000) {
       m88tc6800_set_reg_bits(priv, 0x5b, 0x6, 0x3, 0x5);
       m88tc6800_expand_reg_bits(priv, 0x4e, 0x8, 0x1, 0x7, 0x7);
-      m88tc6800_set_tune(priv, 0x79ac9, 0x32, wait_time);
+      m88tc6800_set_tune(priv, 0x79ac9, 0x32, wait_time_ms);
       m88tc6800_write_reg(priv, 0x39, 0x77);
       m88tc6800_read_reg(priv, 0x3a, &reg_data);
       m88tc6800_write_reg(priv, 0x39, 0x77);
