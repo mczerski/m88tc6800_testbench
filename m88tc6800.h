@@ -13,6 +13,8 @@ struct m88tc6800_config {
 	u8 im;
 	u8 custom_cfg;
 	u8 harmonic_imp;
+	u8 dac_gain;
+	u32 dac;
 };
 
 struct m88tc6800_priv {
@@ -23,12 +25,6 @@ struct m88tc6800_priv {
 	uint32_t fvco_tg;
 //	uint32_t freq_khz;
 	uint32_t bandwidth_hz;
-//	u8 locked;
-//	enum fe_delivery_system delivery_system;
-//	u32 rf_frequency_hz;
-//	u32 if_frequency_hz;
-//	u32 bandwidth_hz;
-//	u32 lpf_hz;
 };
 
 extern struct m88tc6800_priv priv;

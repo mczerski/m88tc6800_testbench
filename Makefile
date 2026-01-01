@@ -1,5 +1,16 @@
 all: preset set_rf_front set_mixer set_lo set_pll set_bandwidth set_dac set_freq set_tune
 
+test: all
+	./preset
+	./set_rf_front
+	./set_mixer
+	./set_lo
+	./set_pll
+	./set_bandwidth
+	./set_dac
+	./set_tune
+#	./set_freq
+
 common.o: common.c common.h
 	gcc -c common.c -o common.o
 

@@ -8,7 +8,9 @@
 struct m88tc6800_priv priv = {
     .config = {
         .xtal = 27000,
-        .xtal_cap = 0x18
+        .xtal_cap = 0x18,
+        .dac_gain = 2,
+        .dac = 4570
     }
 };
 
@@ -697,12 +699,12 @@ void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv)
 
 void m88tc6800_set_dac(struct m88tc6800_priv *priv, uint32_t freq_khz)
 {
-  uint32_t uVar1 = 0x11da;
+  uint32_t uVar1 = priv->config.dac;
   uint extraout_r0 = freq_khz;
   int iVar2;
   int iVar3;
   uint uVar2;
-  char cVar4;
+  byte cVar4;
   int extraout_r1;
   int extraout_r1_00;
   uint uVar6;
@@ -730,7 +732,13 @@ void m88tc6800_set_dac(struct m88tc6800_priv *priv, uint32_t freq_khz)
                        Unresolved local var: uint32_t z2@[???]
                        Unresolved local var: uint32_t tmp@[???]
                        Unresolved local var: uint32_t f1f2number@[???] */
-  m88tc6800_write_reg(priv, 0x22,0x95);
+  if (uVar1 < 0x1195) {
+    cVar4 = 0x40;
+  }
+  else {
+    cVar4 = 0x80;
+  }
+  m88tc6800_write_reg(priv, 0x22, cVar4 + priv->config.dac_gain * '\b' + 0x5);
   m88tc6800_set_reg_bits(priv, 0x20,0x3,0x5,0x6);
   if (priv->config.xtal == 24000) {
     m88tc6800_write_reg(priv, 0x4e,0x6);
