@@ -89,7 +89,12 @@ void m88tc6800_preset(struct m88tc6800_priv *priv)
 {
     u8 reg_data;
 
-    m88tc6800_write_reg(priv, 0x0b, 0x6d);
+    if (0 < priv->config.mode && priv->config.mode <= 2) {
+        m88tc6800_write_reg(priv, 0x0b, 0x7d);
+    }
+    else {
+        m88tc6800_write_reg(priv, 0x0b, 0x6d);
+    }
     m88tc6800_write_reg(priv, 0x0c, 0xe3);
     m88tc6800_write_reg(priv, 0x0d, 0xc4);
     m88tc6800_read_reg(priv, 0x9a, &reg_data);
@@ -117,19 +122,96 @@ void m88tc6800_preset(struct m88tc6800_priv *priv)
 
 void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz)
 {
-    m88tc6800_write_reg(priv, 0x88, 0x2b);
-    m88tc6800_write_reg(priv, 0x89, 0x2b);
-    m88tc6800_write_reg(priv, 0x8a, 0xab);
-    m88tc6800_write_reg(priv, 0x39, 0x69);
-    if (freq_khz <= 602000) {
-        m88tc6800_write_reg(priv, 0x3a, 0x2d);
-        m88tc6800_write_reg(priv, 0x8b, 0x55);
+    u8 reg_data;
+
+    if (priv->config.im == 0) {
+        m88tc6800_write_reg(priv, 0x88, 0x27);
+        m88tc6800_write_reg(priv, 0x89, 0x2b);
+        m88tc6800_write_reg(priv, 0x8a, 0x67);
+        m88tc6800_write_reg(priv, 0x39, 0x69);
+        m88tc6800_write_reg(priv, 0x3a, 0x12);
+        if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+            m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x22);
+            m88tc6800_write_reg(priv, 0xfd, 0x1a);
+        }
+        else {
+            m88tc6800_write_reg(priv, 0x8b, 0xaa);
+            m88tc6800_write_reg(priv, 0xfd, 0x12);
+        }
+    }
+    else if (priv->config.im == 1) {
+        m88tc6800_write_reg(priv, 0x88, 0x1b);
+        m88tc6800_write_reg(priv, 0x89, 0x2b);
+        m88tc6800_write_reg(priv, 0x8a, 0x1b);
+        m88tc6800_write_reg(priv, 0x39, 0x69);
+        m88tc6800_write_reg(priv, 0x3a, 0x12);
+        if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+            m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x22);
+            m88tc6800_write_reg(priv, 0xfd, 0x1a);
+        }
+        else {
+            m88tc6800_write_reg(priv, 0x8b, 0xaa);
+            m88tc6800_write_reg(priv, 0xfd, 0x12);
+        }
+    }
+    else if (priv->config.im == 2) {
+        m88tc6800_write_reg(priv, 0x88, 0x2b);
+        m88tc6800_write_reg(priv, 0x89, 0x2b);
+        m88tc6800_write_reg(priv, 0x8a, 0xab);
+        m88tc6800_write_reg(priv, 0x39, 0x69);
+        if (freq_khz <= 602000) {
+            m88tc6800_write_reg(priv, 0x3a, 0x2d);
+            if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x55);
+                m88tc6800_write_reg(priv, 0xfd, 0x1a);
+            }
+            else {
+                m88tc6800_read_reg(priv, 0x8b, &reg_data);
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : reg_data | 0x88);
+                m88tc6800_write_reg(priv, 0xfd, 0x12);
+            }
+        }
+        else {
+            m88tc6800_write_reg(priv, 0x3a, 0x09);
+            if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x11);
+                m88tc6800_write_reg(priv, 0xfd, 0x1a);
+            }
+            else {
+                m88tc6800_read_reg(priv, 0x8b, &reg_data);
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : reg_data | 0x88);
+                m88tc6800_write_reg(priv, 0xfd, 0x12);
+            }
+        }
     }
     else {
-        m88tc6800_write_reg(priv, 0x3a, 0x09);
-        m88tc6800_write_reg(priv, 0x8b, 0x11);
+        m88tc6800_write_reg(priv, 0x88, 0x2b);
+        m88tc6800_write_reg(priv, 0x89, 0x2b);
+        m88tc6800_write_reg(priv, 0x8a, 0xab);
+        m88tc6800_write_reg(priv, 0x39, 0x69);
+        if (freq_khz <= 602000) {
+            m88tc6800_write_reg(priv, 0x3a, 0x2d);
+            if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x55);
+                m88tc6800_write_reg(priv, 0xfd, 0x1a);
+            }
+            else {
+                m88tc6800_write_reg(priv, 0x8b, 0xaa);
+                m88tc6800_write_reg(priv, 0xfd, 0x12);
+            }
+        }
+        else {
+            m88tc6800_write_reg(priv, 0x3a, 0x09);
+            if ((priv->config.mode == 0 || priv->config.mode > 2) || priv->config.lt < 2) {
+                m88tc6800_write_reg(priv, 0x8b, priv->config.custom_cfg == 1 ? 0xaa : 0x11);
+                m88tc6800_write_reg(priv, 0xfd, 0x1a);
+            }
+            else {
+                m88tc6800_write_reg(priv, 0x8b, 0xaa);
+                m88tc6800_write_reg(priv, 0xfd, 0x12);
+            }
+        }
     }
-    m88tc6800_write_reg(priv, 0xfd, 0x1a);
     if (freq_khz > 112000) {
         if (freq_khz <= 334000) {
             m88tc6800_write_reg(priv, 0x7f, 0x04);
@@ -165,6 +247,9 @@ void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz)
         m88tc6800_write_reg(priv, 0x99, 0xb6);
     }
     m88tc6800_write_reg(priv, 0x26, 0x11);
+    if (priv->config.harmonic_imp != 1) {
+        return;
+    }
     if (freq_khz >= 366000 && freq_khz <= 374000) {
         m88tc6800_write_reg(priv, 0x94, 0x29);
     }

@@ -8,6 +8,11 @@ struct m88tc6800_config {
 	u8 addr;
 	u32 xtal;
 	u8 xtal_cap;
+	u8 mode;
+	u8 lt;
+	u8 im;
+	u8 custom_cfg;
+	u8 harmonic_imp;
 };
 
 struct m88tc6800_priv {
