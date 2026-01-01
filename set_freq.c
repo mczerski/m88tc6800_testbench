@@ -1,0 +1,19 @@
+#include "common.h"
+#include "original.h"
+#include "m88tc6800.h"
+
+int main() {
+    TC6800_tuner_cfg_cxd2856.tuner_bandwidth = 8000;
+    priv.bandwidth_hz = 8000;
+    for (uint32_t freq = 1; freq < 1000000; freq++) {
+        init();
+        TC6800_tuner_cfg_cxd2856.tuner_crystal = 27000;
+        priv.config.xtal = 27000;
+        //printf("freq: %d, crystal: %d, mixer_type: %d\n", freq, priv.config.xtal, mixer_type);
+        mt_fe_tn_set_freq_tc6800_cxd2856(freq);
+        m88tc6800_set_freq(&priv, freq);
+        finish();
+    }
+    printf("set_freq OK\n");
+}
+

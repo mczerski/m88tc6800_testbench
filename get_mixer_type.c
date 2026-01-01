@@ -40,20 +40,6 @@ LAB_0008b808:
   return uVar9;
 }
 
-static u8 m88tc6800_get_mixer_type(u32 freq_khz)
-{
-    if (freq_khz <= 334000) {
-        return 2;
-    }
-    if ((freq_khz >= 480000 && freq_khz <= 492000) ||
-           (freq_khz >= 610000 && freq_khz <= 624000) ||
-           (freq_khz >= 800000 && freq_khz <= 820000) ||
-           (freq_khz >= 366000 && freq_khz <= 374000)) {
-        return 3;
-    }
-    return 1;
-}
-
 int main() {
 
     for (uint32_t i = 0; i < 1000000; i++) {
