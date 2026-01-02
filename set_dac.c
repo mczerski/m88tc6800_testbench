@@ -10,14 +10,13 @@ int main() {
         priv.config.dac = dac_list[j];
         for (int i = 0; i < sizeof(bw_list) / sizeof(bw_list[0]); i++) {
             TC6800_tuner_cfg_cxd2856.tuner_bandwidth = bw_list[i];
-            priv.bandwidth_hz = bw_list[i];
             for (uint32_t freq = 0; freq < 1000000; freq++) {
                 init();
                 TC6800_tuner_cfg_cxd2856.tuner_crystal = 24000;
                 priv.config.xtal = 24000;
                 //printf("dac: %d, freq: %d, bw: %d, xtal: 24k\n", dac_list[j], freq, bw_list[i]);
                 _mt_fe_tn_set_DAC_tc6800_cxd2856(freq);
-                m88tc6800_set_dac(&priv, freq);
+                m88tc6800_set_dac(&priv, freq, bw_list[i]);
                 finish();
 
                 init();
@@ -25,7 +24,7 @@ int main() {
                 priv.config.xtal = 27000;
                 //printf("dac: %d, freq: %d, bw: %d, xtal: 27k\n", dac_list[j], freq, bw_list[i]);
                 _mt_fe_tn_set_DAC_tc6800_cxd2856(freq);
-                m88tc6800_set_dac(&priv, freq);
+                m88tc6800_set_dac(&priv, freq, bw_list[i]);
                 finish();
             }
         }

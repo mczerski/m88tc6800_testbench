@@ -1,4 +1,4 @@
-all: preset set_rf_front set_mixer set_lo set_pll set_bandwidth set_dac set_freq set_tune
+all: preset set_rf_front set_mixer set_lo set_pll set_bandwidth set_dac set_freq set_tune get_rf_strength
 
 test: all
 	./preset
@@ -9,7 +9,8 @@ test: all
 	./set_bandwidth
 	./set_dac
 	./set_tune
-#	./set_freq
+	./set_freq
+	./get_rf_strength
 
 common.o: common.c common.h
 	gcc -c common.c -o common.o
@@ -49,3 +50,6 @@ set_freq: set_freq.c common.h lib.a
 
 set_tune: set_tune.c common.h lib.a
 	gcc set_tune.c -o set_tune -L. -l:lib.a
+
+get_rf_strength: get_rf_strength.c common.h lib.a
+	gcc get_rf_strength.c -o get_rf_strength -L. -l:lib.a

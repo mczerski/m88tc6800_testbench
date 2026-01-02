@@ -8,10 +8,9 @@ int main() {
         uint32_t bw = bw_list[i];
         init();
         TC6800_tuner_cfg_cxd2856.tuner_bandwidth = bw;
-        priv.bandwidth_hz = bw;
         //printf("bw: %d\n", bw);
         _mt_fe_tn_set_BB_tc6800_cxd2856();
-        m88tc6800_set_bandwidth(&priv);
+        m88tc6800_set_bandwidth(&priv, bw);
         finish();
     }
     printf("set_bandwidth OK\n");

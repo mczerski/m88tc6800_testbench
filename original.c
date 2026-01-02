@@ -1,7 +1,7 @@
 #include "common.h"
 #include "original.h"
 
-#define printk(...)
+#define printk(...) 0
 #define sony_sleep(ms)
 struct _MT_FE_TN_Device_Settings_TC6800 TC6800_tuner_cfg_cxd2856 = {
   .tuner_mode = 0x0,
@@ -23,6 +23,73 @@ struct _MT_FE_TN_Device_Settings_TC6800 TC6800_tuner_cfg_cxd2856 = {
   .tuner_harmonic_imp = 0x1,
   .tuner_version = 0x7a,
   .tuner_fw_version = 0xc,
+};
+
+static uint32_t xm_list_dBm[] = {
+       0x0,           0x0,         0x25A,         0x3BA,
+     0x4B4,         0x576,         0x614,         0x69A,
+     0x70E,         0x774,         0x7D0,         0x823,
+     0x86E,         0x8B4,         0x8F4,         0x930,
+     0x968,         0x99D,         0x9CF,         0x9FE,
+     0xA2A,         0xA54,         0xA7D,         0xAA3,
+     0xAC8,         0xAEC,         0xB0E,         0xB2F,
+     0xB4E,         0xB6D,         0xB8A,         0xBA7,
+     0xBC2,         0xBDD,         0xBF7,         0xC10,
+     0xC29,         0xC40,         0xC58,         0xC6E,
+     0xC84,         0xC9A,         0xCAE,         0xCC3,
+     0xCD7,         0xCEA,         0xCFE,         0xD10,
+     0xD22,         0xD34,         0xD46,         0xD57,
+     0xD68,         0xD79,         0xD89,         0xD99,
+     0xDA8,         0xDB8,         0xDC7,         0xDD6,
+     0xDE4,         0xDF3,         0xE01,         0xE0F,
+     0xE1C,         0xE2A,         0xE37,         0xE44,
+     0xE51,         0xE5E,         0xE6A,         0xE77,
+     0xE83,         0xE8F,         0xE9A,         0xEA6,
+     0xEB2,         0xEBD,         0xEC8,         0xED3,
+     0xEDE,         0xEE9,         0xEF4,         0xEFE,
+     0xF09,         0xF13,         0xF1D,         0xF27,
+     0xF31,         0xF3B,         0xF44,         0xF4E,
+     0xF58,         0xF61,         0xF6A,         0xF73,
+     0xF7D,         0xF86,         0xF8E,         0xF97,
+     0xFA0,         0xFA9,         0xFB1,         0xFBA,
+     0xFC2,         0xFCA,         0xFD3,         0xFDB,
+     0xFE3,         0xFEB,         0xFF3,         0xFFB,
+    0x1002,        0x100A,        0x1012,        0x1019,
+    0x1021,        0x1028,        0x1030,        0x1037,
+    0x103E,        0x1046,        0x104D,        0x1054,
+    0x105B,        0x1062,        0x1069,        0x1070,
+    0x1076,        0x107D,        0x1084,        0x108B,
+    0x1091,        0x1098,        0x109E,        0x10A5,
+    0x10AB,        0x10B1,        0x10B8,        0x10BE,
+    0x10C4,        0x10CA,        0x10D1,        0x10D7,
+    0x10DD,        0x10E3,        0x10E9,        0x10EF,
+    0x10F5,        0x10FA,        0x1100,        0x1106,
+    0x110C,        0x1111,        0x1117,        0x111D,
+    0x1122,        0x1128,        0x112D,        0x1133,
+    0x1138,        0x113E,        0x1143,        0x1148,
+    0x114E,        0x1153,        0x1158,        0x115D,
+    0x1163,        0x1168,        0x116D,        0x1172,
+    0x1177,        0x117C,        0x1181,        0x1186,
+    0x118B,        0x1190,        0x1195,        0x119A,
+    0x119F,        0x11A3,        0x11A8,        0x11AD,
+    0x11B2,        0x11B6,        0x11BB,        0x11C0,
+    0x11C4,        0x11C9,        0x11CE,        0x11D2,
+    0x11D7,        0x11DB,        0x11E0,        0x11E4,
+    0x11E9,        0x11ED,        0x11F1,        0x11F6,
+    0x11FA,        0x11FE,        0x1203,        0x1207,
+    0x120B,        0x1210,        0x1214,        0x1218,
+    0x121C,        0x1220,        0x1224,        0x1229,
+    0x122D,        0x1231,        0x1235,        0x1239,
+    0x123D,        0x1241,        0x1245,        0x1249,
+    0x124D,        0x1251,        0x1255,        0x1259,
+    0x125C,        0x1260,        0x1264,        0x1268,
+    0x126C,        0x1270,        0x1273,        0x1277,
+    0x127B,        0x127F,        0x1282,        0x1286,
+    0x128A,        0x128D,        0x1291,        0x1295,
+    0x1298,        0x129C,        0x12A0,        0x12A3,
+    0x12A7,        0x12AA,        0x12AE,        0x12B1,
+    0x12B5,        0x12B8,        0x12BC,        0x12BF,
+    0x12C3,        0x12C6,        0x12CA,        0x12CD
 };
 
 uint8_t tuner_terr_cable_debug = 0;
@@ -2284,4 +2351,170 @@ LAB_0008c440:
     printk(&.LC21,"mt_fe_tn_set_freq_tc6800_cxd2856",0xafe);
   }
   return;
+}
+
+/* WARNING: Enum "anon_enum_32": Some values do not have unique names */
+/* WARNING: Enum "sony_ascot3_tv_system_t": Some values do not have unique names */
+/* WARNING: Enum "sony_helene_tv_system_t": Some values do not have unique names */
+
+uint32_t TC6800_GetRFStrength(GTM_Tuner_t *pTuner,int32_t *pRfStrength)
+
+{
+  uint32_t uVar1;
+  int *extraout_r1 = pRfStrength;
+  uint uVar2;
+  int iVar3;
+  int iVar4;
+  bool bVar5;
+  byte local_31 [5];
+
+                    /* Unresolved local var: uint32_t ret@[???]
+                       Unresolved local var: int32_t rfLevel@[???] */
+  __gnu_mcount_nc();
+                    /* Unresolved local var: uint32_t ret@[???]
+                       Unresolved local var: char[22] __func__@[???] */
+  if (0 < tuner_terr_cable_debug) {
+    printk(&.LC25,"mt_tun_tc6800_command",0xd58,4);
+  }
+                    /* Unresolved local var: uint32_t ret@[???]
+                       Unresolved local var: int32_t rflevel@[???]
+                       Unresolved local var: uint8_t buf@[???]
+                       Unresolved local var: uint8_t bufH@[???]
+                       Unresolved local var: uint8_t bufL@[???]
+                       Unresolved local var: int32_t level@[???]
+                       Unresolved local var: int32_t gain_x10@[???]
+                       Unresolved local var: int32_t gain_ref_x10@[???]
+                       Unresolved local var: int32_t pd_x10@[???]
+                       Unresolved local var: int32_t pdtref_x10@[???]
+                       Unresolved local var: uint32_t freq_KHz@[???]
+                       Unresolved local var: uint32_t[16][16] xm_list_dBm@[???] */
+  uVar1 = TC6800_tuner_cfg_cxd2856.tuner_freq;
+  if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0x1adb1) {
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x63,local_31);
+    uVar2 = (uint)local_31[0];
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x8b,local_31);
+    iVar4 = uVar2 * 10 + -0x1d1;
+    iVar3 = uVar2 * 10 + -0x13b;
+    local_31[0] = local_31[0] & 0x77;
+LAB_0008e5cc:
+    if (local_31[0] == 0x55) {
+      iVar3 = iVar4 + 0x82;
+    }
+    else {
+joined_r0x0008e5dc:
+      if (local_31[0] == 0x11) {
+        if (uVar1 < 0xc3501) {
+          iVar3 = iVar3 + -0x28;
+        }
+        else {
+          iVar3 = iVar3 + -0x19;
+        }
+      }
+    }
+  }
+  else if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0x30d41) {
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x63,local_31);
+    uVar2 = (uint)local_31[0];
+    iVar3 = uVar2 * 10 + -300;
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x8b,local_31);
+    local_31[0] = local_31[0] & 0x77;
+    if (local_31[0] != 0x55) goto joined_r0x0008e5dc;
+    iVar3 = uVar2 * 10 + -0x140;
+  }
+  else {
+    if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0x518b1) {
+      iVar4 = -0x1ae;
+    }
+    else if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0x61a81) {
+      iVar4 = -0x1ea;
+    }
+    else if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0x927c1) {
+      iVar4 = -0x1d6;
+    }
+    else if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0xaae61) {
+      iVar4 = -0x1c7;
+    }
+    else {
+      if (800000 < TC6800_tuner_cfg_cxd2856.tuner_freq) {
+        if (TC6800_tuner_cfg_cxd2856.tuner_freq < 0xdbba1) {
+          _mt_fe_tn_get_reg_tc6800_cxd2856(0x63,local_31);
+          uVar2 = (uint)local_31[0];
+          iVar4 = uVar2 * 10 + -0x1cc;
+          _mt_fe_tn_get_reg_tc6800_cxd2856(0x8b,local_31);
+          iVar3 = uVar2 * 10 + -0x136;
+          local_31[0] = local_31[0] & 0x77;
+          goto LAB_0008e5cc;
+        }
+        _mt_fe_tn_get_reg_tc6800_cxd2856(0x63,local_31);
+        iVar3 = (short)(ushort)local_31[0] * 10 + -0x154;
+        _mt_fe_tn_get_reg_tc6800_cxd2856(0x8b,local_31);
+        local_31[0] = local_31[0] & 0x77;
+        goto LAB_0008e4e4;
+      }
+      iVar4 = -0x1c2;
+    }
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x63,local_31);
+    iVar4 = (short)(ushort)local_31[0] * 10 + iVar4;
+    _mt_fe_tn_get_reg_tc6800_cxd2856(0x8b,local_31);
+    iVar3 = iVar4 + 0x96;
+    local_31[0] = local_31[0] & 0x77;
+    if (uVar1 < 0xdbba1) goto LAB_0008e5cc;
+  }
+LAB_0008e4e4:
+  if (TC6800_tuner_cfg_cxd2856.tuner_application == 0x0) {
+    if (7999 < uVar1 - 0x595b1) {
+      if (uVar1 - 480000 < 0x2ee1) goto LAB_0008e764;
+      if (14000 < uVar1 - 610000) {
+        if (20000 < uVar1 - 800000) goto LAB_0008e508;
+        goto LAB_0008e75c;
+      }
+    }
+  }
+  else if (65999 < uVar1 - 0x518b1) {
+    if (73999 < uVar1 - 0x61a81) {
+      if (((uVar1 - 0x73b91 < 0x1ec30) || (uVar1 - 0x927c1 < 200000)) || (uVar1 - 0xc3501 < 58000))
+      {
+        iVar3 = iVar3 + 0x41;
+        goto LAB_0008e508;
+      }
+      if (41999 < uVar1 - 0xd1791) {
+        if (uVar1 - 0xdbba1 < 120000) {
+          iVar3 = iVar3 + 0xf;
+        }
+        else {
+          bVar5 = uVar1 == 110000;
+          if (uVar1 < 0x1adb1) {
+            bVar5 = TC6800_tuner_cfg_cxd2856.tuner_application == 0x1;
+          }
+          if (bVar5) {
+            iVar3 = iVar3 + -0x1e;
+          }
+        }
+        goto LAB_0008e508;
+      }
+LAB_0008e75c:
+      iVar3 = iVar3 + 10;
+      goto LAB_0008e508;
+    }
+LAB_0008e764:
+    iVar3 = iVar3 + 0x32;
+    goto LAB_0008e508;
+  }
+  iVar3 = iVar3 + 0x3c;
+LAB_0008e508:
+  _mt_fe_tn_get_reg_tc6800_cxd2856(0xc8,local_31);
+  iVar3 = (int)((xm_list_dBm[local_31[0]] / 10 - 0x1a9) - iVar3) / 10;
+  iVar4 = -0x6b;
+  if (-0x6c < iVar3) {
+    iVar4 = iVar3;
+  }
+  if ((0 < tuner_terr_cable_debug) &&
+     (printk(&.LC26,"mt_tun_tc6800_command",0xd73,4), 0 < tuner_terr_cable_debug)) {
+    printk(&.LC27,"TC6800_GetRFStrength",0xd84);
+  }
+  *extraout_r1 = iVar4;
+  if (0 < tuner_terr_cable_debug) {
+    printk(&.LC28,"TC6800_GetRFStrength",0xd88,iVar4,iVar4);
+  }
+  return 0;
 }

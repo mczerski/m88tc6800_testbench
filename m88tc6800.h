@@ -2,7 +2,9 @@
 #include <stdbool.h>
 
 #define u8 uint8_t
+#define u16 uint16_t
 #define u32 uint32_t
+#define s32 int32_t
 
 struct m88tc6800_config {
 	u8 addr;
@@ -21,10 +23,10 @@ struct m88tc6800_priv {
 	struct m88tc6800_config config;
 //	struct i2c_adapter *i2c;
 	bool mcu_status;
-	uint32_t ldiv;
-	uint32_t fvco_tg;
-//	uint32_t freq_khz;
-	uint32_t bandwidth_hz;
+	u32 frequency_hz;
+	u32 bandwidth_hz;
+	u32 ldiv;
+	u32 fvco_tg;
 };
 
 extern struct m88tc6800_priv priv;
@@ -33,7 +35,8 @@ void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz);
 void m88tc6800_set_mixer(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type);
 void m88tc6800_set_lo(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type);
 void m88tc6800_set_pll(struct m88tc6800_priv *priv);
-void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv);
-void m88tc6800_set_dac(struct m88tc6800_priv *priv, uint32_t freq_khz);
-int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz);
-void m88tc6800_set_tune(struct m88tc6800_priv *priv, uint32_t freq_KHz, uint8_t mixer_sel, uint32_t wait_time);
+void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv, u32 bandwidth_hz);
+void m88tc6800_set_dac(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz);
+int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz);
+void m88tc6800_set_tune(struct m88tc6800_priv *priv, u32 freq_KHz, u32 bandwidth_hz, u8 mixer_sel, u32 wait_time_ms);
+int m88tc6800_get_rf_strength(struct m88tc6800_priv *priv, u16 *strength);
