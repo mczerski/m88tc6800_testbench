@@ -1,6 +1,6 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
     TC6800_tuner_cfg_cxd2856.tuner_bandwidth = 8000;

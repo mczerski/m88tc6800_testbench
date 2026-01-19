@@ -1,6 +1,6 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
     for (uint8_t mixer_type = 0; mixer_type < 4; mixer_type++) {

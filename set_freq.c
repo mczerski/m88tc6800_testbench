@@ -1,17 +1,21 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
-    TC6800_tuner_cfg_cxd2856.tuner_bandwidth = 8000;
-    for (uint32_t freq = 1; freq < 1000000; freq++) {
-        init();
-        TC6800_tuner_cfg_cxd2856.tuner_crystal = 27000;
-        priv.config.xtal = 27000;
-        //printf("freq: %d, crystal: %d, mixer_type: %d\n", freq, priv.config.xtal, mixer_type);
-        mt_fe_tn_set_freq_tc6800_cxd2856(freq);
-        m88tc6800_set_freq(&priv, freq, 8000);
-        finish();
+    uint32_t bw_list[] = {1700, 6000, 7000, 8000, 10000};
+    for (int i = 0; i < sizeof(bw_list) / sizeof(bw_list[0]); i++) {
+        uint32_t bw = bw_list[i];
+        TC6800_tuner_cfg_cxd2856.tuner_bandwidth = bw;
+        for (uint32_t freq = 1; freq < 1000000; freq++) {
+            init();
+            TC6800_tuner_cfg_cxd2856.tuner_crystal = 27000;
+            priv.config.xtal = 27000;
+            //printf("freq: %d, bw: %d, xtal: %d\n", freq, bw, priv.config.xtal);
+            mt_fe_tn_set_freq_tc6800_cxd2856(freq);
+            m88tc6800_set_freq(&priv, freq, bw);
+            finish();
+        }
     }
     //TODO: test with tuner_gpio_out: [0, 1]
     //get regs: 0x3e [0x1e, 0x80, 0], 0x7 [8, 0], 0x3c [0x80, 0]

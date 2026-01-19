@@ -1,6 +1,6 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
     for (uint32_t freq = 0; freq < 1000000; freq++) {
@@ -10,11 +10,9 @@ int main() {
         //printf("freq: %d\n", freq);
         int32_t rf_level;
         TC6800_GetRFStrength(NULL, &rf_level);
-        u16 tmp;
         s32 strength;
-        m88tc6800_get_rf_strength(&priv, &tmp);
-        strength = (int16_t)tmp;
-        printf("freq: %d, rf: %d\n", freq, strength);
+        m88tc6800_get_rf_power(&priv, &strength);
+        //printf("freq: %d, rf: %d\n", freq, strength);
         if (rf_level != strength) {
             printf("rf level mismatch: %d - %d\n", rf_level, strength);
             return -1;

@@ -1,6 +1,6 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
     uint32_t bw_list[] = {1700, 6000, 7000, 8000, 10000};

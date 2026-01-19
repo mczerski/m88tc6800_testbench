@@ -1,6 +1,6 @@
 #include "common.h"
 #include "original.h"
-#include "m88tc6800.h"
+#include "new.h"
 
 int main() {
     uint32_t dac_list[] = {4500, 4501, 4570, 7200};
