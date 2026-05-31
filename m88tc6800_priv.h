@@ -24,7 +24,7 @@ int m88tc6800_set_reg_bits(struct m88tc6800_priv *priv, u8 reg, u8 val, u8 begin
 u32 m88tc6800_expand_reg_bits(struct m88tc6800_priv *priv, u8 reg_expand, u8 reg, u8 val, u8 start_bit, u8 end_bit);
 void m88tc6800_preset(struct m88tc6800_priv *priv);
 void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz);
-u8 m88tc6800_get_mixer_type(u32 freq_khz);
+u8 m88tc6800_get_mixer_type(struct m88tc6800_priv *priv, u32 freq_khz);
 void m88tc6800_set_mixer(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type);
 void m88tc6800_set_lo(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type);
 void m88tc6800_set_pll(struct m88tc6800_priv *priv);

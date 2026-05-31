@@ -240,18 +240,23 @@ void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz)
     }
 }
 
-u8 m88tc6800_get_mixer_type(u32 freq_khz)
+u8 m88tc6800_get_mixer_type(struct m88tc6800_priv *priv, u32 freq_khz)
 {
     if (freq_khz <= 334000) {
         return 2;
     }
-    if ((freq_khz >= 480000 && freq_khz <= 492000) ||
-           (freq_khz >= 610000 && freq_khz <= 624000) ||
-           (freq_khz >= 800000 && freq_khz <= 820000) ||
-           (freq_khz >= 366000 && freq_khz <= 374000)) {
-        return 3;
+    if (priv->config.harmonic_imp == 1) {
+        if ((freq_khz >= 480000 && freq_khz <= 492000) ||
+               (freq_khz >= 610000 && freq_khz <= 624000) ||
+               (freq_khz >= 800000 && freq_khz <= 820000) ||
+               (freq_khz >= 366000 && freq_khz <= 374000)) {
+            return 3;
+        }
+        return 1;
     }
-    return 1;
+    else {
+        return 1;
+    }
 }
 
 void m88tc6800_set_mixer(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type)
@@ -1068,8 +1073,8 @@ int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_
     m88tc6800_preset(priv);
     m88tc6800_set_rf_frontend(priv, freq_khz);
     m88tc6800_write_reg(priv, 0x05, 0xf8);
-    m88tc6800_set_mixer(priv, freq_khz, m88tc6800_get_mixer_type(freq_khz));
-    m88tc6800_set_lo(priv, freq_khz, m88tc6800_get_mixer_type(freq_khz));
+    m88tc6800_set_mixer(priv, freq_khz, m88tc6800_get_mixer_type(priv, freq_khz));
+    m88tc6800_set_lo(priv, freq_khz, m88tc6800_get_mixer_type(priv, freq_khz));
     m88tc6800_set_pll(priv);
     m88tc6800_set_bandwidth(priv, bandwidth_hz);
     m88tc6800_write_reg(priv, 0x04, 0x00);
