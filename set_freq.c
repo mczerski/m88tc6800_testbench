@@ -29,7 +29,7 @@ int main() {
                         for (int mode=0; mode < sizeof(mode_list); mode++) {
                             uint8_t custom_cfg_list[] = {0, 1};
                             for (int custom_cfg=0; custom_cfg<sizeof(custom_cfg_list); custom_cfg++) {
-                                printf("bw: %d, xtal: %d, harmonic_imp: %d, int_lt: %d, mode: %d, custom_cfg: %d, 0x3e: %d, 0x07: %d, 0x3c: %d, 0x9e: %d\n", bw, xtal, harmonic_imp, int_lt, mode, custom_cfg, i2c_reg[0x3e], i2c_reg[0x07], i2c_reg[0x3c], i2c_reg[0x9a]);
+                                //printf("bw: %d, xtal: %d, harmonic_imp: %d, int_lt: %d, mode: %d, custom_cfg: %d, 0x3e: %d, 0x07: %d, 0x3c: %d, 0x9e: %d\n", bw, xtal, harmonic_imp, int_lt, mode, custom_cfg, i2c_reg[0x3e], i2c_reg[0x07], i2c_reg[0x3c], i2c_reg[0x9a]);
                                 for (uint32_t freq = 1000; freq < 1000000; freq+=1000) {
                                     init();
                                     TC6800_tuner_cfg_cxd2856.tuner_crystal = xtal_list[xtal];

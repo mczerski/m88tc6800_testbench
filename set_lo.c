@@ -10,8 +10,8 @@ int main() {
             _mt_fe_tn_set_LO_tc6800_cxd2856(freq, mixer_type);
             m88tc6800_set_lo(&priv, freq, mixer_type);
             finish();
-            if (TC6800_tuner_cfg_cxd2856.tuner_int_ldiv != priv.ldiv) {
-                printf("ldiv: actual %02x, expected %02x\n", priv.ldiv, TC6800_tuner_cfg_cxd2856.tuner_int_ldiv);
+            if (TC6800_tuner_cfg_cxd2856.tuner_int_ldiv != priv.int_ldiv) {
+                printf("ldiv: actual %02x, expected %02x\n", priv.int_ldiv, TC6800_tuner_cfg_cxd2856.tuner_int_ldiv);
                 return 0;
             }
             if (TC6800_tuner_cfg_cxd2856.tuner_int_fvco_tg != priv.fvco_tg) {
