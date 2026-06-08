@@ -1291,10 +1291,10 @@ LAB_0008b74c:
     }
   }
 LAB_0008b808:
-  //_mt_fe_tn_get_reg_tc6800_cxd2856(0x3c,&local_37);
+  _mt_fe_tn_get_reg_tc6800_cxd2856(0x3c,&local_37);
   bVar6 = local_37 & 0x80;
   local_37 = local_37 & 0x80;
-  if (false/*bVar6 == 0*/) {
+  if (bVar6 == 0) {
                     /* Unresolved local var: uint8_t data1@[???]
                        Unresolved local var: uint8_t data2@[???]
                        Unresolved local var: uint8_t data3@[???]
@@ -1883,10 +1883,10 @@ LAB_0008b808:
   _mt_fe_tn_set_reg_tc6800_cxd2856(0x5,0x0);
   uVar1 = TC6800_tuner_cfg_cxd2856.tuner_freq;
   local_31[0] = 0;
-  //_mt_fe_tn_get_reg_tc6800_cxd2856(0x3e,local_31);
+  _mt_fe_tn_get_reg_tc6800_cxd2856(0x3e,local_31);
   bVar6 = local_31[0] & 0x80;
-  if (false/*(((uint)TC6800_tuner_cfg_cxd2856.tuner_mode - 1 < 2) && (1 < TC6800_tuner_cfg_cxd2856.tuner_int_lt))
-     && ((local_31[0] & 0x80) == 0)*/) {
+  if ((((uint)TC6800_tuner_cfg_cxd2856.tuner_mode - 1 < 2) && (1 < TC6800_tuner_cfg_cxd2856.tuner_int_lt))
+     && ((local_31[0] & 0x80) == 0)) {
     local_31[0] = bVar6;
     if (uVar1 < 0xe8e90) {
       if (uVar1 < 0xd1790) {
