@@ -20,11 +20,6 @@ struct m88tc6800_config {
 	u8 addr;
 	u32 xtal;
 	u8 xtal_cap;
-	u8 mode;
-	u8 int_lt;
-	u8 int_im;
-	u8 custom_cfg;
-	u8 harmonic_imp;
 	u8 dac_gain;
 	u32 dac;
 };

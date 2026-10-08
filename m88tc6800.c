@@ -5,11 +5,6 @@ struct m88tc6800_priv priv = {
     .config = {
         .xtal = 27000,
         .xtal_cap = 0x18,
-        .mode = 0,
-        .int_lt = 2,
-        .int_im = 2,
-        .custom_cfg = 0,
-        .harmonic_imp = 1,
         .dac_gain = 2,
         .dac = 4570
     }
