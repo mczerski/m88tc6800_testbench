@@ -548,14 +548,14 @@ void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv, u32 bandwidth_hz)
         m88tc6800_write_reg(priv, 0x29, 0xa8);
         m88tc6800_write_reg(priv, 0x86, 0x12);
     }
-    else if (bandwidth_hz == 8000) {
-        m88tc6800_write_reg(priv, 0x59, 0x0c);
-        m88tc6800_write_reg(priv, 0x29, 0xa8);
+    else if (bandwidth_hz == 10000) {
+        m88tc6800_write_reg(priv, 0x59, 0x0d);
+        m88tc6800_write_reg(priv, 0x29, 0xa6);
         m88tc6800_write_reg(priv, 0x86, 0x12);
     }
     else {
-        m88tc6800_write_reg(priv, 0x59, 0x0d);
-        m88tc6800_write_reg(priv, 0x29, 0xa6);
+        m88tc6800_write_reg(priv, 0x59, 0x0c);
+        m88tc6800_write_reg(priv, 0x29, 0xa8);
         m88tc6800_write_reg(priv, 0x86, 0x12);
     }
 }
@@ -1018,7 +1018,7 @@ int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_
         m88tc6800_read_reg(priv, 0x4b, &reg_data);
         tmp2 = reg_data;
         m88tc6800_read_reg(priv, 0x4c, &reg_data);
-        tmp3 = (((tmp1 & 0xf) << 8) + tmp2) >> ((reg_data << 25) >> 30);
+        tmp3 = (((tmp1 & 0xf) << 8) + tmp2) >> (((u32)reg_data << 25) >> 30);
         if (priv->config.xtal == 27000) {
             tmp3 = 1000 * (tmp3 * 216) / 24;
         }

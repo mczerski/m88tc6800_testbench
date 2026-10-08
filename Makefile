@@ -1,8 +1,10 @@
-all: preset set_rf_front set_mixer set_lo set_pll set_bandwidth set_dac set_freq set_tune get_rf_strength
+all: reg_bits preset set_rf_front get_mixer_type set_mixer set_lo set_pll set_bandwidth set_dac set_freq set_tune get_rf_strength
 
 test: all
+	./reg_bits
 	./preset
 	./set_rf_front
+	./get_mixer_type
 	./set_mixer
 	./set_lo
 	./set_pll
@@ -30,11 +32,17 @@ m88tc6800_priv.o: m88tc6800_priv.c m88tc6800.h m88tc6800_priv.h common.h
 lib.a: common.o original.o m88tc6800.o m88tc6800_priv.o
 	ar -r lib.a common.o original.o m88tc6800.o m88tc6800_priv.o
 
+reg_bits: reg_bits.c common.h original.h new.h m88tc6800_priv.h m88tc6800.h lib.a
+	gcc reg_bits.c -o reg_bits -L. -l:lib.a
+
 preset: preset.c common.h original.h new.h m88tc6800_priv.h m88tc6800.h lib.a
 	gcc preset.c -o preset -L. -l:lib.a
 
 set_rf_front: set_rf_front.c common.h original.h new.h m88tc6800_priv.h m88tc6800.h lib.a
 	gcc set_rf_front.c -o set_rf_front -L. -l:lib.a
+
+get_mixer_type: get_mixer_type.c common.h original.h new.h m88tc6800_priv.h m88tc6800.h lib.a
+	gcc get_mixer_type.c -o get_mixer_type -L. -l:lib.a
 
 set_mixer: set_mixer.c common.h original.h new.h m88tc6800_priv.h m88tc6800.h lib.a
 	gcc set_mixer.c -o set_mixer -L. -l:lib.a

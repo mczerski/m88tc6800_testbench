@@ -10,3 +10,5 @@ set_dac
 set_freq
 set_tune
 get_rf_strength
+get_mixer_type
+reg_bits

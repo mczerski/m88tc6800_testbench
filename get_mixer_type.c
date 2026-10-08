@@ -1,4 +1,6 @@
 #include "common.h"
+#include "original.h"
+#include "new.h"
 
 uint16_t get_mixer_type_orig(uint32_t freq_KHz_00) {
   uint16_t uVar9;
@@ -41,14 +43,19 @@ LAB_0008b808:
 }
 
 int main() {
+    suite_init();
 
-    for (uint32_t i = 0; i < 1000000; i++) {
-        init();
-        uint16_t expected = get_mixer_type_orig(i);
-        uint16_t actual = m88tc6800_get_mixer_type(i);
+    TC6800_tuner_cfg_cxd2856.tuner_mixer_type = 0;   /* auto */
+    TC6800_tuner_cfg_cxd2856.tuner_application = 0;
+    TC6800_tuner_cfg_cxd2856.tuner_harmonic_imp = 1;
+
+    for (uint32_t freq = freq_start; freq < freq_stop; freq += freq_stride) {
+        uint16_t expected = get_mixer_type_orig(freq);
+        uint16_t actual = m88tc6800_get_mixer_type(&priv, freq);
         if (actual != expected) {
-            printf("test freq: %d; actual %d different than expected %d\n", i, actual, expected);
-            return 0;
+            printf("freq: %d; actual %d different than expected %d\n", freq, actual, expected);
+            return -1;
         }
     }
+    printf("get_mixer_type OK\n");
 }

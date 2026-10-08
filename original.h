@@ -3,6 +3,11 @@
 
 #define GTM_Tuner_t void
 extern struct _MT_FE_TN_Device_Settings_TC6800 TC6800_tuner_cfg_cxd2856;
+uint32_t _mt_fe_tn_set_reg_bit_tc6800_cxd2856(uint8_t reg_addr,uint8_t data,
+                                              uint8_t high_bit,uint8_t low_bit);
+uint32_t _mt_fe_tn_set_reg_bit_expand_tc6800_cxd2856(uint8_t reg_addr_expand,uint8_t reg_addr,
+                                                     uint8_t reg_data,uint8_t high_bit,
+                                                     uint8_t low_bit);
 void _mt_fe_tn_preset_tc6800_cxd2856(void);
 void _mt_fe_tn_set_RF_front_tc6800_cxd2856(uint32_t freq_KHz);
 void _mt_fe_tn_set_Mixer_tc6800_cxd2856(uint32_t freq_KHz,uint8_t mixer_sel);
