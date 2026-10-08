@@ -18,35 +18,33 @@ int m88tc6800_set_reg_bits(struct m88tc6800_priv *priv, u8 reg, u8 val, u8 begin
   return ret;
 }
 
-u32 m88tc6800_expand_reg_bits(struct m88tc6800_priv *priv, u8 reg_expand, u8 reg, u8 val, u8 start_bit, u8 end_bit)
+/* Read-modify-write a bit field of an indexed sub-register.
+ *
+ * The chip has two indexed register banks: write a sub-register index to
+ * the index register (0x4e or 0x53), then access that sub-register through
+ * the data register immediately following it (0x4f or 0x54). The index is
+ * re-written before the data write because the read in between leaves the
+ * bank pointing elsewhere on real hardware.
+ *
+ * Unlike m88tc6800_set_reg_bits() the two bit positions may be given in
+ * either order; the field is always bits [high..low] of the data register.
+ */
+u32 m88tc6800_expand_reg_bits(struct m88tc6800_priv *priv, u8 index_reg, u8 index,
+                              u8 val, u8 start_bit, u8 end_bit)
 {
-  byte reg_data_00;
-  uint8_t reg_addr_00 = reg_expand;
-  uint8_t reg_data_01 = reg;
-  int extraout_r2 = val;
-  uint extraout_r3 = end_bit;
-  uint uVar1;
-  uint uVar2;
-  uint uVar3;
-  byte local_31 [5];
-  
-  uVar2 = (uint)start_bit;
-  local_31[0] = 0;
-  uVar1 = uVar2;
-  uVar3 = extraout_r3;
-  if (uVar2 <= extraout_r3) {
-    uVar1 = extraout_r3;
-    uVar3 = uVar2;
-  }
-  uVar3 = (uVar3 + 7) - uVar1;
-  m88tc6800_write_reg(priv, reg_addr_00,reg_data_01);
-  m88tc6800_read_reg(priv, reg_addr_00 + 0x1,local_31);
-  reg_data_00 = (local_31[0] & ~(byte)((int)(0xff << (uVar3 & 0xff) & 0xffU) >> (7 - uVar1 & 0xff))) |
-                (byte)((int)(extraout_r2 << (uVar3 & 0xff) & 0xffU) >> (7 - uVar1 & 0xff));
-  local_31[0] = reg_data_00;
-  m88tc6800_write_reg(priv, reg_addr_00,reg_data_01);
-  m88tc6800_write_reg(priv, reg_addr_00 + 0x1,reg_data_00);
-  return 0;
+    u8 high_bit = start_bit > end_bit ? start_bit : end_bit;
+    u8 low_bit = start_bit > end_bit ? end_bit : start_bit;
+    u8 val_mask = ((1 << (high_bit - low_bit + 1)) - 1) << low_bit;
+    u8 reg_data;
+
+    m88tc6800_write_reg(priv, index_reg, index);
+    m88tc6800_read_reg(priv, index_reg + 1, &reg_data);
+
+    reg_data = (reg_data & ~val_mask) | ((val << low_bit) & val_mask);
+
+    m88tc6800_write_reg(priv, index_reg, index);
+    m88tc6800_write_reg(priv, index_reg + 1, reg_data);
+    return 0;
 }
 
 void m88tc6800_preset(struct m88tc6800_priv *priv)
@@ -157,378 +155,378 @@ void m88tc6800_set_rf_frontend(struct m88tc6800_priv *priv, u32 freq_khz)
 
 u8 m88tc6800_get_mixer_type(struct m88tc6800_priv *priv, u32 freq_khz)
 {
-    if (freq_khz <= 334000) {
-        return 2;
-    }
-    if ((freq_khz >= 480000 && freq_khz <= 492000) ||
-           (freq_khz >= 610000 && freq_khz <= 624000) ||
-           (freq_khz >= 800000 && freq_khz <= 820000) ||
-           (freq_khz >= 366000 && freq_khz <= 374000)) {
-        return 3;
-    }
-    return 1;
+    if (freq_khz <= 334000)
+        return M88TC6800_MIXER_DIV;
+
+    /* Bands where an LO harmonic lands in-band and the harmonic-rejection
+     * mixer is needed. These are the same four ranges that
+     * m88tc6800_set_rf_frontend() retunes reg 0x94 and reg 0x3a for. */
+    if ((freq_khz >= 366000 && freq_khz <= 374000) ||
+            (freq_khz >= 480000 && freq_khz <= 492000) ||
+            (freq_khz >= 610000 && freq_khz <= 624000) ||
+            (freq_khz >= 800000 && freq_khz <= 820000))
+        return M88TC6800_MIXER_HARMONIC;
+
+    return M88TC6800_MIXER_NORMAL;
 }
 
 void m88tc6800_set_mixer(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type)
 {
-    u8 tmp = mixer_type;
-    if (mixer_type == 2) {
-        if (freq_khz >= 125000) {
-            if (freq_khz < 167000) {
-                m88tc6800_write_reg(priv, 0x2f, 0x10);
-            }
-            else if (freq_khz < 250000) {
-                m88tc6800_write_reg(priv, 0x2f, 0x21);
-            }
-            else if (freq_khz < 335000) {
-                m88tc6800_write_reg(priv, 0x2f, 0x32);
-            }
-            else {
-                m88tc6800_write_reg(priv, 0x2f, 0x43);
-            }
-        }
-        else {
+    /* Only M88TC6800_MIXER_DIV and M88TC6800_MIXER_HARMONIC are passed
+     * through to the chip; anything else selects the normal mixer. */
+    u8 mixer_sel = mixer_type;
+
+    if (mixer_type == M88TC6800_MIXER_DIV) {
+        /* Divider mixer: reg 0x2f carries a band code that tracks the LO
+         * divider steps chosen by m88tc6800_set_lo() for the same band. */
+        if (freq_khz < 125000)
             m88tc6800_write_reg(priv, 0x2f, 0x00);
-        }
+        else if (freq_khz < 167000)
+            m88tc6800_write_reg(priv, 0x2f, 0x10);
+        else if (freq_khz < 250000)
+            m88tc6800_write_reg(priv, 0x2f, 0x21);
+        else if (freq_khz < 335000)
+            m88tc6800_write_reg(priv, 0x2f, 0x32);
+        else
+            m88tc6800_write_reg(priv, 0x2f, 0x43);
     }
     else {
-        if (mixer_type != 3) {
-            tmp = 1;
-        }
+        if (mixer_type != M88TC6800_MIXER_HARMONIC)
+            mixer_sel = M88TC6800_MIXER_NORMAL;
         m88tc6800_write_reg(priv, 0x2f, 0x00);
     }
-    m88tc6800_set_reg_bits(priv, 0x0b, tmp, 0, 1);
-    if (freq_khz >= 330000 && freq_khz <= 400000) {
+
+    m88tc6800_set_reg_bits(priv, 0x0b, mixer_sel, 0, 1);
+
+    /* Extra filtering around the 330..400 MHz harmonic trouble spot. */
+    if (freq_khz >= 330000 && freq_khz <= 400000)
         m88tc6800_write_reg(priv, 0x32, 0x04);
-    }
-    else {
+    else
         m88tc6800_write_reg(priv, 0x32, 0x00);
-    }
 }
+
+/* One row of an LO divider table: applies to every frequency below
+ * below_khz that no earlier row claimed. The last row uses U32_MAX as an
+ * open-ended catch-all. */
+struct m88tc6800_lo_band {
+    u32 below_khz;
+    u8 div_cfg;     /* reg 0x14: LO divider / buffer configuration */
+    u8 lo_div;      /* LO divider ratio, Fvco = freq * lo_div */
+};
+
+/* Divider mixer below 500 MHz. */
+static const struct m88tc6800_lo_band m88tc6800_lo_div_mixer[] = {
+    {  63000, 0x8b, 0x80 },
+    {  83000, 0x7a, 0x60 },
+    { 125000, 0x0a, 0x40 },
+    { 167000, 0x0d, 0x30 },
+    { 250000, 0x09, 0x20 },
+    { 335000, 0x0c, 0x18 },
+    { 0xffffffff, 0x08, 0x10 },
+};
+
+/* Normal mixer, and the harmonic mixer below 250 MHz. Same divider ratios
+ * as the table above, but a different buffer configuration and a lower
+ * crossover at the bottom end (56 MHz instead of 63 MHz). */
+static const struct m88tc6800_lo_band m88tc6800_lo_normal[] = {
+    {  56000, 0x0b, 0x80 },
+    {  83000, 0x7a, 0x60 },
+    { 125000, 0x0a, 0x40 },
+    { 167000, 0x79, 0x30 },
+    { 250000, 0x09, 0x20 },
+    { 335000, 0x78, 0x18 },
+    { 500000, 0x08, 0x10 },
+    { 667000, 0x74, 0x0c },
+    { 0xffffffff, 0x04, 0x08 },
+};
+
+/* Harmonic mixer at 250 MHz and above. */
+static const struct m88tc6800_lo_band m88tc6800_lo_harmonic[] = {
+    { 333000, 0xf8, 0x18 },
+    { 500000, 0x88, 0x10 },
+    { 666000, 0x74, 0x0c },
+    { 0xffffffff, 0x04, 0x08 },
+};
 
 void m88tc6800_set_lo(struct m88tc6800_priv *priv, u32 freq_khz, u8 mixer_type)
 {
-    u8 reg_data;
-    if (freq_khz < 500000 && mixer_type == 2) {
-        if (freq_khz < 63000) {
-            reg_data = 0x8b;
-            priv->ldiv = 0x80;
-        }
-        else if (freq_khz < 83000) {
-            reg_data = 0x7a;
-            priv->ldiv = 0x60;
-        }
-        else if (freq_khz < 125000) {
-            reg_data = 0x0a;
-            priv->ldiv = 0x40;
-        }
-        else if (freq_khz < 167000) {
-            reg_data = 0x0d;
-            priv->ldiv = 0x30;
-        }
-        else if (freq_khz < 250000) {
-            reg_data = 0x09;
-            priv->ldiv = 0x20;
-        }
-        else if (freq_khz < 335000) {
-            reg_data = 0x0c;
-            priv->ldiv = 0x18;
-        }
-        else {
-            reg_data = 0x08;
-            priv->ldiv = 0x10;
-        }
-    }
-    else if (freq_khz < 250000 || mixer_type != 3) {
-        if (freq_khz < 56000) {
-            reg_data = 0x0b;
-            priv->ldiv = 0x80;
-        }
-        else if (freq_khz < 83000) {
-            reg_data = 0x7a;
-            priv->ldiv = 0x60;
-        }
-        else if (freq_khz < 125000) {
-            reg_data = 0x0a;
-            priv->ldiv = 0x40;
-        }
-        else if (freq_khz < 167000) {
-            reg_data = 0x79;
-            priv->ldiv = 0x30;
-        }
-        else if (freq_khz < 250000) {
-            reg_data = 0x09;
-            priv->ldiv = 0x20;
-        }
-        else if (freq_khz < 335000) {
-            reg_data = 0x78;
-            priv->ldiv = 0x18;
-        }
-        else if (freq_khz < 500000) {
-            reg_data = 0x08;
-            priv->ldiv = 0x10;
-        }
-        else if (freq_khz < 667000) {
-            reg_data = 0x74;
-            priv->ldiv = 0x0c;
-        }
-        else {
-            reg_data = 0x04;
-            priv->ldiv = 0x08;
-        }
-    }
-    else {
-        if (freq_khz < 333000) {
-            reg_data = 0xf8;
-            priv->ldiv = 0x18;
-        }
-        else if (freq_khz < 500000) {
-            reg_data = 0x88;
-            priv->ldiv = 0x10;
-        }
-        else if (freq_khz < 666000) {
-            reg_data = 0x74;
-            priv->ldiv = 0x0c;
-        }
-        else {
-            reg_data = 0x04;
-            priv->ldiv = 0x08;
-        }
-    }
-    priv->fvco_tg = freq_khz * priv->ldiv;
-    if (priv->fvco_tg < 6700000) {
+    const struct m88tc6800_lo_band *band;
+
+    if (freq_khz < 500000 && mixer_type == M88TC6800_MIXER_DIV)
+        band = m88tc6800_lo_div_mixer;
+    else if (freq_khz < 250000 || mixer_type != M88TC6800_MIXER_HARMONIC)
+        band = m88tc6800_lo_normal;
+    else
+        band = m88tc6800_lo_harmonic;
+
+    while (freq_khz >= band->below_khz)
+        band++;
+
+    priv->lo_div = band->lo_div;
+    priv->fvco_target = freq_khz * priv->lo_div;
+
+    /* reg 0x13[5:3]: VCO gain (kvco) tuning, stepped at the 6.7 GHz
+     * boundary of the tuning range. This is the direct register 0x13, not
+     * the indexed sub-register 0x13 that m88tc6800_set_pll() writes the
+     * charge pump code to. */
+    if (priv->fvco_target < 6700000)
         m88tc6800_set_reg_bits(priv, 0x13, 4, 3, 5);
-    }
-    else {
+    else
         m88tc6800_set_reg_bits(priv, 0x13, 7, 3, 5);
-    }
-    m88tc6800_write_reg(priv, 0x14, reg_data);
+
+    m88tc6800_write_reg(priv, 0x14, band->div_cfg);
+}
+
+/* ------------------------------------------------------------------ *
+ * PLL
+ *
+ * The VCO runs at fvco = pll_ref * FDIV. FDIV is fixed point: a 14-bit
+ * integer part (FDIV_N) and a 12-bit fraction (FDIV_F) fed to a
+ * delta-sigma modulator. m88tc6800_set_lo() has already chosen the LO
+ * divider, and so the target fvco in priv->fvco_target.
+ *
+ * Choosing the reference is a spur problem. With a 27 MHz crystal a
+ * target close to a multiple of the crystal is better served by an 18 MHz
+ * reference plus DSM spur optimisation than by the 54 MHz default; with a
+ * 24 MHz crystal the 334..340 MHz LO band wants 24 MHz instead of 48 MHz.
+ *
+ * Everything here goes through the indexed bank at reg 0x4e/0x4f.
+ * ------------------------------------------------------------------ */
+
+/* A fraction this close to 0 or 1 (in units of 1/4096) is rounded to an
+ * integer ratio instead of being dithered by the modulator. */
+#define M88TC6800_SDM_MIN_FRAC	0x21
+
+/* FDIV = fvco_target * 16 / pll_ref, split into an integer part and a 12-bit
+ * fraction. The reference is pre-divided rather than the target multiplied
+ * up so the intermediate stays inside 32 bits; scale compensates for
+ * references that 16 does not divide evenly. */
+static void m88tc6800_calc_fdiv(u32 fvco_target, u32 ref_step, u32 scale,
+				u32 *fdiv_n, u32 *fdiv_f)
+{
+	u32 num = fvco_target * scale;
+
+	*fdiv_n = num / ref_step;
+	*fdiv_f = ((num % ref_step) << 12) / ref_step;
+}
+
+/* Pick the PLL reference and compute FDIV for it. Returns the reference in
+ * kHz; *spur_opti is the DSM spur-optimisation level, which later divides
+ * the charge pump code down (0 = none, 1 = halve, 2 = quarter). */
+static u32 m88tc6800_select_pll_ref(struct m88tc6800_priv *priv, u8 *spur_opti,
+				    u32 *fdiv_n, u32 *fdiv_f)
+{
+	u32 fvco_target = priv->fvco_target;
+	u32 crystal = priv->config.xtal;
+	u32 pll_ref;
+
+	*spur_opti = 0;
+
+	if (crystal == 24000) {
+		u32 freq_lo_khz = fvco_target / priv->lo_div;
+
+		if (freq_lo_khz >= 334001 && freq_lo_khz <= 339999)
+			pll_ref = 24000;
+		else
+			pll_ref = 48000;
+	}
+	else if (crystal == 27000) {
+		u32 nearest = ((fvco_target + 13500) / 27000) * 27000;
+		u32 dist = fvco_target > nearest ? fvco_target - nearest : nearest - fvco_target;
+
+		/* Right on a crystal multiple, or far enough away from one,
+		 * the plain 54 MHz reference is fine. In between, drop to
+		 * 18 MHz and let the modulator spread the spur. */
+		if (dist > 10 && dist < 1010) {
+			pll_ref = 18000;
+			*spur_opti = 2;
+		}
+		else if (dist > 1020 && dist < 2020) {
+			pll_ref = 18000;
+			*spur_opti = 1;
+		}
+		else {
+			pll_ref = 54000;
+		}
+	}
+	else {
+		pll_ref = crystal * 2;
+
+		/* References that are not a whole multiple of 16 kHz need the
+		 * divider computed at a finer scale to stay exact. */
+		if (pll_ref == 9000 || pll_ref == 27000) {
+			m88tc6800_calc_fdiv(fvco_target, pll_ref / 8, 2, fdiv_n, fdiv_f);
+			return pll_ref;
+		}
+		if (pll_ref == 13500) {
+			m88tc6800_calc_fdiv(fvco_target, pll_ref / 4, 4, fdiv_n, fdiv_f);
+			return pll_ref;
+		}
+	}
+
+	m88tc6800_calc_fdiv(fvco_target, pll_ref / 16, 1, fdiv_n, fdiv_f);
+	return pll_ref;
 }
 
 void m88tc6800_set_pll(struct m88tc6800_priv *priv)
 {
-  uint uVar1;
-  byte bVar2;
-  uint32_t uVar3;
-  uint32_t uVar4;
-  uint uVar5;
-  uint uVar6;
-  uint uVar7;
-  uint8_t uVar8;
-  int extraout_r1;
-  int extraout_r1_00;
-  char cVar9;
-  int iVar10;
-  byte bVar11;
-  uint uVar12;
-  uint uVar13;
-  uint8_t reg_data;
-  uint uVar14;
-  uint uVar15;
-  bool bVar16;
-  uint uVar17;
-  byte local_38;
+	u32 crystal = priv->config.xtal;
+	u32 pll_ref, fdiv_n, fdiv_f, frac;
+	u32 fdiv_n_hi, fdiv_n_lo;
+	u32 fvco_khz, frac_khz;
+	u32 icp_raw, icp_bits, icp_hi, icp_code;
+	u8 fdiv_f_hi, fdiv_f_lo, fdiv_n_lo_bits, icp_clamped;
+	u8 spur_opti;
+	bool sdm_en;
+	s32 icp;
 
-  uVar4 = priv->fvco_tg;
-  uVar3 = priv->config.xtal;
-  uVar1 = priv->config.xtal >> 1;
-  uVar12 = priv->config.xtal * 2;
-  if (priv->config.xtal == 24000) {
-    iVar10 = priv->fvco_tg / priv->ldiv;
-    if (0x176e < iVar10 - 0x518b1U) {
-      cVar9 = '\0';
-      uVar13 = 48000;
-      goto LAB_00089804;
-    }
-    uVar6 = 0x5dc;
-    cVar9 = '\0';
-    uVar13 = 24000;
-LAB_00089808:
-    uVar5 = uVar4 / uVar6;
-    extraout_r1_00 = uVar4 % uVar6;
-    uVar6 = (extraout_r1_00 << 0xc) / uVar6;
-  }
-  else {
-    if (priv->config.xtal == 27000) {
-      iVar10 = (priv->fvco_tg / 27000 -
-               (((int)((ulonglong)(priv->fvco_tg >> 2) * 0x4dac1b9d >>
-                      0x20) << 0x15) >> 0x1f)) * 27000;
-      if (((iVar10 + 10U < priv->fvco_tg) &&
-          (priv->fvco_tg < iVar10 + 0x3f2U)) ||
-         ((priv->fvco_tg < iVar10 - 10U &&
-          (iVar10 - 0x3f2U < priv->fvco_tg)))) {
-        cVar9 = '\x02';
-        uVar13 = 18000;
-      }
-      else if ((iVar10 + 0x3fcU < priv->fvco_tg) &&
-              (priv->fvco_tg < iVar10 + 0x7e4U)) {
-        cVar9 = '\x01';
-        uVar13 = 18000;
-      }
-      else if (priv->fvco_tg < iVar10 - 0x3fcU) {
-        cVar9 = iVar10 - 0x7e4U < priv->fvco_tg;
-        uVar13 = 18000;
-        if (!(bool)cVar9) {
-          uVar13 = 54000;
-        }
-      }
-      else {
-        cVar9 = '\0';
-        uVar13 = 54000;
-      }
-LAB_00089804:
-      uVar6 = uVar13 >> 4;
-      goto LAB_00089808;
-    }
-    uVar13 = uVar12;
-    if (uVar12 == 9000 || uVar12 == 27000) {
-      uVar6 = uVar12 >> 3;
-      iVar10 = priv->fvco_tg << 1;
-      uVar5 = iVar10 / uVar6;
-      extraout_r1 = iVar10 % uVar6;
-      cVar9 = '\0';
-      uVar6 = (extraout_r1 << 0xc) / uVar6;
-    }
-    else {
-      cVar9 = '\0';
-      if (uVar12 != 0x34bc) goto LAB_00089804;
-      uVar5 = (priv->fvco_tg * 4) / 0xd2f;
-      uVar6 = (((priv->fvco_tg * 4) % 0xd2f) * 0x1000) / 0xd2f;
-    }
-  }
-  uVar15 = (uVar5 << 0x12) >> 0x16;
-  uVar14 = uVar5 & 0xf;
-  if ((uVar6 & 0xfff) - 0x21 < 0xfbf) {
-    reg_data = (uint8_t)uVar6;
-    bVar16 = true;
-    local_38 = (byte)((uVar6 << 0x14) >> 0x1c) | 0x30;
-    uVar6 = uVar13 * (uVar6 & 0xfff) >> 0x10;
-  }
-  else {
-    if ((uVar6 & 0x800) != 0) {
-      uVar15 = (uVar5 + 1) * 0x40000 >> 0x16;
-      uVar14 = uVar5 + 1 & 0xf;
-    }
-    bVar16 = false;
-    reg_data = 0x0;
-    local_38 = 0x30;
-    uVar6 = 0;
-  }
-  uVar6 = uVar13 * uVar15 + uVar6 + (uVar13 * uVar14 >> 4);
-  if (uVar6 < 8000000) {
-    uVar6 = (uVar6 * -4 + 32000000) / 0x9eb1;
-  }
-  else {
-    uVar6 = -(((uVar6 + 0x3f85ee00) * 4) / 0x9eb1);
-  }
-  uVar7 = uVar6 + 0x100;
-  uVar17 = uVar7 * 0x80000 >> 0x18;
-  uVar5 = (uVar17 & 1) + (uVar7 >> 6) & 0xff;
-  if (uVar3 == uVar13) {
-    uVar17 = uVar17 - ((int)(uVar6 << 0x1b) >> 0x1f);
-    m88tc6800_write_reg(priv, 0x4e,0x11);
-    uVar8 = 0x11;
-LAB_000898b0:
-    uVar5 = uVar17 & 0xff;
-    m88tc6800_write_reg(priv, 0x4f,uVar8);
-    m88tc6800_write_reg(priv, 0x4e,0x10);
-    uVar8 = 0x8;
-  }
-  else {
-    if (uVar13 == uVar12 / 3) {
-      m88tc6800_write_reg(priv, 0x4e,0x11);
-      m88tc6800_write_reg(priv, 0x4f,0x33);
-      m88tc6800_write_reg(priv, 0x4e,0x10);
-      m88tc6800_write_reg(priv, 0x4f,0xb);
-      m88tc6800_write_reg(priv, 0x4e,0x15);
-      uVar5 = uVar5 + (uVar17 - ((int)(uVar6 << 0x1b) >> 0x1f)) & 0xff;
-      m88tc6800_write_reg(priv, 0x4f,0x43);
-      goto LAB_00089584;
-    }
-    if (uVar13 == uVar3 / 3) {
-      uVar12 = uVar7 * 0x100000 >> 0x18;
-      m88tc6800_write_reg(priv, 0x4e,0x11);
-      m88tc6800_write_reg(priv, 0x4f,0x33);
-      m88tc6800_write_reg(priv, 0x4e,0x10);
-      m88tc6800_write_reg(priv, 0x4f,0x8);
-      m88tc6800_write_reg(priv, 0x4e,0x15);
-      uVar5 = ((uVar17 + uVar12) - ((int)(uVar6 << 0x1c) >> 0x1f)) + (uVar12 & 1) & 0xff;
-      m88tc6800_write_reg(priv, 0x4f,0x63);
-      goto LAB_00089584;
-    }
-    if (uVar1 == uVar13) {
-      uVar17 = (uVar7 >> 4) - ((int)(uVar6 << 0x1c) >> 0x1f);
-      m88tc6800_write_reg(priv, 0x4e,0x11);
-      uVar8 = 0x22;
-      goto LAB_000898b0;
-    }
-    m88tc6800_write_reg(priv, 0x4e,0x11);
-    m88tc6800_write_reg(priv, 0x4f,0x11);
-    m88tc6800_write_reg(priv, 0x4e,0x10);
-    uVar8 = 0xb;
-  }
-  m88tc6800_write_reg(priv, 0x4f,uVar8);
-  m88tc6800_write_reg(priv, 0x4e,0x15);
-  m88tc6800_write_reg(priv, 0x4f,0x13);
-LAB_00089584:
-  if (bVar16) {
-    m88tc6800_write_reg(priv, 0x4e,0x12);
-    uVar5 = uVar5 - 1 & 0xff;
-    m88tc6800_write_reg(priv, 0x4f,0x21);
-  }
-  else {
-    m88tc6800_write_reg(priv, 0x4e,0x12);
-    m88tc6800_write_reg(priv, 0x4f,0x0);
-  }
-  if (cVar9 == '\x01') {
-    uVar5 = uVar5 >> 1;
-  }
-  else if (cVar9 == '\x02') {
-    uVar5 = uVar5 >> 2;
-  }
-  if (uVar5 < 2) {
-    uVar5 = 2;
-  }
-  bVar11 = (byte)uVar5;
-  if (0xe < uVar5) {
-    bVar11 = 0xf;
-  }
-  m88tc6800_write_reg(priv, 0x4e,0xa);
-  m88tc6800_write_reg(priv, 0x4f,0x63);
-  m88tc6800_write_reg(priv, 0x4e,0xf);
-  m88tc6800_write_reg(priv, 0x4f,0x3d);
-  m88tc6800_write_reg(priv, 0x4e,0xb);
-  m88tc6800_write_reg(priv, 0x4f,0xa1);
-  m88tc6800_write_reg(priv, 0x3d,0xff);
-  m88tc6800_write_reg(priv, 0x4e,0x1c);
-  m88tc6800_write_reg(priv, 0x4f,0x7e);
-  bVar2 = (byte)(uVar14 << 3);
-  if (bVar16) {
-    m88tc6800_write_reg(priv, 0x4e,0x19);
-    m88tc6800_write_reg(priv, 0x4f,bVar2 | 3);
-    m88tc6800_write_reg(priv, 0x4e,0x19);
-    m88tc6800_write_reg(priv, 0x4f,bVar2 | 7);
-  }
-  else {
-    m88tc6800_write_reg(priv, 0x4e,0x19);
-    m88tc6800_write_reg(priv, 0x4f,bVar2 | 2);
-    m88tc6800_write_reg(priv, 0x4e,0x19);
-    m88tc6800_write_reg(priv, 0x4f,bVar2 | 6);
-  }
-  m88tc6800_write_reg(priv, 0x4e,0x17);
-  m88tc6800_write_reg(priv, 0x4f,(byte)(uVar15 >> 8) | 0xc);
-  m88tc6800_write_reg(priv, 0x4e,0x18);
-  m88tc6800_write_reg(priv, 0x4f,(uint8_t)uVar15);
-  m88tc6800_write_reg(priv, 0x4e,0x1a);
-  m88tc6800_write_reg(priv, 0x4f,local_38);
-  m88tc6800_write_reg(priv, 0x4e,0x1b);
-  m88tc6800_write_reg(priv, 0x4f,reg_data);
-  m88tc6800_write_reg(priv, 0x4e,0xe);
-  m88tc6800_write_reg(priv, 0x4f,0x58);
-  m88tc6800_write_reg(priv, 0x4e,0x14);
-  m88tc6800_write_reg(priv, 0x4f,0x4c);
-  m88tc6800_write_reg(priv, 0x4e,0x13);
-  m88tc6800_write_reg(priv, 0x4f,bVar11 | 0x10);
+	pll_ref = m88tc6800_select_pll_ref(priv, &spur_opti, &fdiv_n, &fdiv_f);
+
+	/* FDIV_N is split 10 + 4 bits: the upper part across regs 0x17/0x18,
+	 * the lower nibble into reg 0x19. */
+	fdiv_n_hi = (fdiv_n >> 4) & 0x3ff;
+	fdiv_n_lo = fdiv_n & 0xf;
+
+	frac = fdiv_f & 0xfff;
+	sdm_en = frac >= M88TC6800_SDM_MIN_FRAC &&
+		 frac <= 0x1000 - M88TC6800_SDM_MIN_FRAC;
+
+	if (sdm_en) {
+		fdiv_f_lo = fdiv_f;				/* reg 0x1b */
+		fdiv_f_hi = ((fdiv_f >> 8) & 0xf) | 0x30;	/* reg 0x1a */
+		frac_khz = pll_ref * frac >> 16;
+	}
+	else {
+		/* Round FDIV_N to nearest and hand the PLL an integer ratio. */
+		if (fdiv_f & 0x800) {
+			fdiv_n_hi = ((fdiv_n + 1) >> 4) & 0x3ff;
+			fdiv_n_lo = (fdiv_n + 1) & 0xf;
+		}
+		fdiv_f_lo = 0x00;
+		fdiv_f_hi = 0x30;
+		frac_khz = 0;
+	}
+
+	/* VCO frequency the divider actually realises, which is what the
+	 * charge pump current has to be matched to. */
+	fvco_khz = pll_ref * fdiv_n_hi + frac_khz + (pll_ref * fdiv_n_lo >> 4);
+
+	/* Charge pump code, linear in the VCO frequency: one step per
+	 * 40625 kHz, crossing zero at 8 GHz. */
+	icp = (32000000 - 4 * (s32)fvco_khz) / 40625;
+	icp_bits = (u32)icp;
+	icp_raw = icp_bits + 0x100;
+
+	/* icp_raw is consumed at a different fixed-point scale per reference
+	 * ratio; the truncating masks come from the original's shifts. */
+	icp_hi = (icp_raw & 0x1fff) >> 5;
+	icp_code = ((icp_hi & 1) + (icp_raw >> 6)) & 0xff;
+
+	/* Prescaler setup, selected by how the reference relates to the
+	 * crystal. Only the first ratio and the x2/3 one below are reachable
+	 * with the 24 and 27 MHz crystals the driver supports; the /3 and /2
+	 * cases are carried over from the original unchanged. */
+	if (pll_ref == crystal) {
+		icp_code = (icp_hi + ((icp_bits >> 4) & 1)) & 0xff;
+		m88tc6800_write_reg(priv, 0x4e, 0x11);
+		m88tc6800_write_reg(priv, 0x4f, 0x11);
+		m88tc6800_write_reg(priv, 0x4e, 0x10);
+		m88tc6800_write_reg(priv, 0x4f, 0x08);
+		m88tc6800_write_reg(priv, 0x4e, 0x15);
+		m88tc6800_write_reg(priv, 0x4f, 0x13);
+	}
+	else if (pll_ref == crystal * 2 / 3) {
+		icp_code = (icp_code + icp_hi + ((icp_bits >> 4) & 1)) & 0xff;
+		m88tc6800_write_reg(priv, 0x4e, 0x11);
+		m88tc6800_write_reg(priv, 0x4f, 0x33);
+		m88tc6800_write_reg(priv, 0x4e, 0x10);
+		m88tc6800_write_reg(priv, 0x4f, 0x0b);
+		m88tc6800_write_reg(priv, 0x4e, 0x15);
+		m88tc6800_write_reg(priv, 0x4f, 0x43);
+	}
+	else if (pll_ref == crystal / 3) {
+		u32 icp_hi4 = (icp_raw & 0xfff) >> 4;
+
+		icp_code = (icp_hi + icp_hi4 + ((icp_bits >> 3) & 1) +
+			    (icp_hi4 & 1)) & 0xff;
+		m88tc6800_write_reg(priv, 0x4e, 0x11);
+		m88tc6800_write_reg(priv, 0x4f, 0x33);
+		m88tc6800_write_reg(priv, 0x4e, 0x10);
+		m88tc6800_write_reg(priv, 0x4f, 0x08);
+		m88tc6800_write_reg(priv, 0x4e, 0x15);
+		m88tc6800_write_reg(priv, 0x4f, 0x63);
+	}
+	else if (pll_ref == crystal / 2) {
+		icp_code = ((icp_raw >> 4) + ((icp_bits >> 3) & 1)) & 0xff;
+		m88tc6800_write_reg(priv, 0x4e, 0x11);
+		m88tc6800_write_reg(priv, 0x4f, 0x22);
+		m88tc6800_write_reg(priv, 0x4e, 0x10);
+		m88tc6800_write_reg(priv, 0x4f, 0x08);
+		m88tc6800_write_reg(priv, 0x4e, 0x15);
+		m88tc6800_write_reg(priv, 0x4f, 0x13);
+	}
+	else {
+		m88tc6800_write_reg(priv, 0x4e, 0x11);
+		m88tc6800_write_reg(priv, 0x4f, 0x11);
+		m88tc6800_write_reg(priv, 0x4e, 0x10);
+		m88tc6800_write_reg(priv, 0x4f, 0x0b);
+		m88tc6800_write_reg(priv, 0x4e, 0x15);
+		m88tc6800_write_reg(priv, 0x4f, 0x13);
+	}
+
+	/* Sub-register 0x12: ICP scaling, enabled only in fractional mode. */
+	m88tc6800_write_reg(priv, 0x4e, 0x12);
+	if (sdm_en) {
+		icp_code = (icp_code - 1) & 0xff;
+		m88tc6800_write_reg(priv, 0x4f, 0x21);
+	}
+	else {
+		m88tc6800_write_reg(priv, 0x4f, 0x00);
+	}
+
+	/* Spur optimisation pays for the spread spectrum with loop gain. */
+	if (spur_opti == 1)
+		icp_code >>= 1;
+	else if (spur_opti == 2)
+		icp_code >>= 2;
+
+	if (icp_code < 2)
+		icp_code = 2;
+	icp_clamped = icp_code > 14 ? 0xf : icp_code;
+
+	m88tc6800_write_reg(priv, 0x4e, 0x0a);
+	m88tc6800_write_reg(priv, 0x4f, 0x63);
+	m88tc6800_write_reg(priv, 0x4e, 0x0f);
+	m88tc6800_write_reg(priv, 0x4f, 0x3d);
+	m88tc6800_write_reg(priv, 0x4e, 0x0b);
+	m88tc6800_write_reg(priv, 0x4f, 0xa1);
+	m88tc6800_write_reg(priv, 0x3d, 0xff);
+	m88tc6800_write_reg(priv, 0x4e, 0x1c);
+	m88tc6800_write_reg(priv, 0x4f, 0x7e);
+
+	/* Sub-register 0x19: FDIV_N[3:0] in bits [6:3], modulator enable in
+	 * bit 0, VCO calibration strobe in bit 2. Written twice to raise the
+	 * strobe once the divider is in place. */
+	fdiv_n_lo_bits = fdiv_n_lo << 3;
+	m88tc6800_write_reg(priv, 0x4e, 0x19);
+	m88tc6800_write_reg(priv, 0x4f, fdiv_n_lo_bits | (sdm_en ? 3 : 2));
+	m88tc6800_write_reg(priv, 0x4e, 0x19);
+	m88tc6800_write_reg(priv, 0x4f, fdiv_n_lo_bits | (sdm_en ? 7 : 6));
+
+	m88tc6800_write_reg(priv, 0x4e, 0x17);
+	m88tc6800_write_reg(priv, 0x4f, (fdiv_n_hi >> 8) | 0x0c);
+	m88tc6800_write_reg(priv, 0x4e, 0x18);
+	m88tc6800_write_reg(priv, 0x4f, fdiv_n_hi);
+	m88tc6800_write_reg(priv, 0x4e, 0x1a);
+	m88tc6800_write_reg(priv, 0x4f, fdiv_f_hi);
+	m88tc6800_write_reg(priv, 0x4e, 0x1b);
+	m88tc6800_write_reg(priv, 0x4f, fdiv_f_lo);
+	m88tc6800_write_reg(priv, 0x4e, 0x0e);
+	m88tc6800_write_reg(priv, 0x4f, 0x58);
+	m88tc6800_write_reg(priv, 0x4e, 0x14);
+	m88tc6800_write_reg(priv, 0x4f, 0x4c);
+	m88tc6800_write_reg(priv, 0x4e, 0x13);
+	m88tc6800_write_reg(priv, 0x4f, icp_clamped | 0x10);
 }
 
 void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv, u32 bandwidth_hz)
@@ -560,163 +558,153 @@ void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv, u32 bandwidth_hz)
     }
 }
 
-void m88tc6800_set_dac(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz)
+/* Channels used by m88tc6800_set_poweron() for calibration. The ADC spur
+ * search is skipped entirely for the first one. */
+#define M88TC6800_CAL_FREQ_KHZ		997375
+#define M88TC6800_CAL_FREQ_27M_KHZ	498377
+
+/* Minimum distance a channel must keep from an ADC spur, in kHz. */
+#define M88TC6800_SPUR_GUARD_KHZ	4001
+
+/* One ADC clock candidate.
+ *
+ * The selector is written to indexed sub-register 6 *before* the candidate
+ * is tested, so a rejected candidate still leaves its write in the I2C
+ * stream. That is deliberate and is what the comparison against
+ * original.c checks, so the writes must not be hoisted out of the search.
+ */
+struct m88tc6800_adc_clock {
+	u8 sel;			/* indexed sub-register 6 selector */
+	u32 spur_spacing_khz;	/* spur spacing to clear, 0 = last resort */
+	u32 fadc_khz;
+};
+
+/* Candidates in preference order. The first entry is the nominal 108 MHz
+ * clock; the rest trade a less convenient clock for a clear spectrum. */
+static const struct m88tc6800_adc_clock m88tc6800_adc_clocks_24m[] = {
+	{ 0x0d, 27000, 108000 },
+	{ 0x12, 30000, 120000 },
+	{ 0x16, 32400, 129600 },
+	{ 0x0f, 28200, 112800 },
+	{ 0x11,     0, 117600 },
+};
+
+static const struct m88tc6800_adc_clock m88tc6800_adc_clocks_27m[] = {
+	{ 0x08, 27000, 108000 },
+	{ 0x0c, 29700, 118800 },
+	{ 0x10, 32400, 129600 },
+	{ 0x0a, 28350, 113400 },
+	{ 0x0b,     0, 116100 },
+};
+
+/* The ADC clock produces spurs at multiples of spur_spacing_khz. A channel
+ * is clear when it stays at least M88TC6800_SPUR_GUARD_KHZ away from the
+ * nearest multiple on either side.
+ *
+ * The subtraction is deliberately unsigned: a channel sitting below the
+ * lower guard wraps to a large value and so fails the comparison, which is
+ * exactly the rejection the hardware wants.
+ */
+static bool m88tc6800_adc_clock_is_clear(u32 freq_khz, u32 spur_spacing_khz)
 {
-  uint32_t uVar1 = priv->config.dac;
-  uint extraout_r0 = freq_khz;
-  int iVar2;
-  int iVar3;
-  uint uVar2;
-  byte cVar4;
-  int extraout_r1;
-  int extraout_r1_00;
-  uint uVar6;
-  uint uVar7;
-  
-                    /* Unresolved local var: uint32_t DACFreq_KHz@[???]
-                       Unresolved local var: uint32_t fc@[???]
-                       Unresolved local var: uint32_t fadc@[???]
-                       Unresolved local var: uint32_t fsd@[???]
-                       Unresolved local var: uint32_t f2d@[???]
-                       Unresolved local var: uint8_t tempnumber@[???]
-                       Unresolved local var: uint8_t flt_bit@[???]
-                       Unresolved local var: uint8_t gain_bit@[???]
-                       Unresolved local var: uint8_t R_22@[???]
-                       Unresolved local var: uint32_t FreqTrue108_Hz@[???]
-                       Unresolved local var: uint32_t f1@[???]
-                       Unresolved local var: uint32_t f2@[???]
-                       Unresolved local var: uint32_t delta1@[???]
-                       Unresolved local var: uint32_t Totalnum1@[???]
-                       Unresolved local var: uint32_t cntT@[???]
-                       Unresolved local var: uint32_t cntin@[???]
-                       Unresolved local var: uint32_t NCOI@[???]
-                       Unresolved local var: uint32_t z0@[???]
-                       Unresolved local var: uint32_t z1@[???]
-                       Unresolved local var: uint32_t z2@[???]
-                       Unresolved local var: uint32_t tmp@[???]
-                       Unresolved local var: uint32_t f1f2number@[???] */
-  if (uVar1 < 0x1195) {
-    cVar4 = 0x40;
-  }
-  else {
-    cVar4 = 0x80;
-  }
-  m88tc6800_write_reg(priv, 0x22, cVar4 + priv->config.dac_gain * '\b' + 0x5);
-  m88tc6800_set_reg_bits(priv, 0x20,0x3,0x5,0x6);
-  if (priv->config.xtal == 24000) {
-    m88tc6800_write_reg(priv, 0x4e,0x6);
-    m88tc6800_write_reg(priv, 0x4f,0xd);
-LAB_0008a204:
-    if (extraout_r0 != 0xf37ff) {
-      if (priv->config.xtal == 24000) {
-        if (0x4a36 < (extraout_r0 + ((extraout_r0 >> 3) / 0xd2f) * -27000) - 0xfa1) {
-          m88tc6800_write_reg(priv, 0x4e,0x6);
-          m88tc6800_write_reg(priv, 0x4f,0x12);
-          if (extraout_r0 % 30000 - 0xfa1 < 21999) {
-            uVar7 = 120000;
-            uVar6 = 120000000;
-          }
-          else {
-            m88tc6800_write_reg(priv, 0x4e,0x6);
-            m88tc6800_write_reg(priv, 0x4f,0x16);
-            if (extraout_r0 % 0x7e90 - 0xfa1 < 0x5f4f) {
-              uVar7 = 0x1fa40;
-              uVar6 = 0x7b98a00;
-            }
-            else {
-              m88tc6800_write_reg(priv, 0x4e,0x6);
-              m88tc6800_write_reg(priv, 0x4f,0xf);
-              if ((extraout_r0 + ((extraout_r0 >> 3) / 0xdc5) * -0x6e28) - 0xfa1 < 0x4ee7) {
-                uVar7 = 0x1b8a0;
-                uVar6 = 0x6b93100;
-              }
-              else {
-                m88tc6800_write_reg(priv, 0x4e,0x6);
-                m88tc6800_write_reg(priv, 0x4f,0x11);
-                uVar7 = 0x1cb60;
-                uVar6 = 0x7026f00;
-              }
-            }
-          }
-          goto LAB_0008a048;
-        }
-      }
-      else if (priv->config.xtal == 27000) {
-        if (extraout_r0 % 27000 - 0xfa1 < 18999) {
-          uVar7 = 0x1a5e0;
-          uVar6 = 108000000;
-        }
-        else {
-          m88tc6800_write_reg(priv, 0x4e,0x6);
-          m88tc6800_write_reg(priv, 0x4f,0xc);
-          if (extraout_r0 % 0x7404 - 0xfa1 < 0x54c3) {
-            uVar7 = 0x1d010;
-            uVar6 = 0x714be80;
-          }
-          else {
-            m88tc6800_write_reg(priv, 0x4e,0x6);
-            m88tc6800_write_reg(priv, 0x4f,0x10);
-            if (extraout_r0 % 0x7e90 - 0xfa1 < 0x5f4f) {
-              uVar7 = 0x1fa40;
-              uVar6 = 0x7b98a00;
-            }
-            else {
-              m88tc6800_write_reg(priv, 0x4e,0x6);
-              m88tc6800_write_reg(priv, 0x4f,0xa);
-              if (extraout_r0 % 0x6ebe - 0xfa1 < 0x4f7d) {
-                uVar7 = 0x1baf8;
-                uVar6 = 0x6c258c0;
-              }
-              else {
-                m88tc6800_write_reg(priv, 0x4e,0x6);
-                m88tc6800_write_reg(priv, 0x4f,0xb);
-                uVar7 = 0x1c584;
-                uVar6 = 0x6eb8ba0;
-              }
-            }
-          }
-        }
-        if (extraout_r0 == 0x79ac9) {
-          m88tc6800_write_reg(priv, 0x4e,0x6);
-          m88tc6800_write_reg(priv, 0x4f,0x4);
-        }
-        goto LAB_0008a048;
-      }
-    }
-  }
-  else if (priv->config.xtal == 27000) {
-    m88tc6800_write_reg(priv, 0x4e,0x6);
-    m88tc6800_write_reg(priv, 0x4f,0x8);
-    goto LAB_0008a204;
-  }
-  uVar7 = 0x1a5e0;
-  uVar6 = 108000000;
-LAB_0008a048:
-  extraout_r1 = (uVar1 * 0x7d000) % uVar6;
-  iVar2 = (extraout_r1 << 5) / uVar6;
-  iVar3 = (uVar1 * 0x7d000) / uVar6;
-  iVar2 = (iVar2 + iVar3 * 0x20) * 4;
-  m88tc6800_write_reg(priv, 0xfa,(uint8_t)((uint)iVar2 >> 8));
-  m88tc6800_write_reg(priv, 0xfb,(uint8_t)iVar2);
-  iVar2 = (bandwidth_hz >> 1) - 100;
-  iVar2 = iVar2 * 0x1a5e0;
-  iVar3 = iVar2 / uVar7;
-  iVar2 = (0x1000 - iVar3) * 0x8000;
-  uVar2 = (unsigned)iVar2 / iVar3;
-  extraout_r1_00 = (unsigned)iVar2 % iVar3;
-  m88tc6800_write_reg(priv, 0xe0,(byte)((uint)(extraout_r1_00 << 0x14) >> 0x1c));
-  m88tc6800_write_reg(priv, 0xe1,(uint8_t)extraout_r1_00);
-  m88tc6800_write_reg(priv, 0xe2,(uint8_t)((uint)iVar3 >> 8));
-  m88tc6800_write_reg(priv, 0xe3,(uint8_t)iVar3);
-  m88tc6800_write_reg(priv, 0xe4,(uint8_t)((ushort)(undefined2)uVar2 >> 8));
-  m88tc6800_write_reg(priv, 0xe5,(uint8_t)(undefined2)uVar2);
-  m88tc6800_write_reg(priv, 0xef,0x0);
-  m88tc6800_write_reg(priv, 0xf0,0x0);
-  m88tc6800_write_reg(priv, 0xf1,0x8);
-  iVar2 = ((uint)(iVar3 << 0xf) >> 0xb) - 0x8000;
-  m88tc6800_write_reg(priv, 0xf2,0x0);
-  m88tc6800_write_reg(priv, 0xf3,(uint8_t)((uint)iVar2 >> 8));
-  m88tc6800_write_reg(priv, 0xf4,(uint8_t)iVar2);
+	u32 offset_khz = freq_khz % spur_spacing_khz;
+	u32 window_khz = spur_spacing_khz - 2 * M88TC6800_SPUR_GUARD_KHZ + 1;
+
+	return offset_khz - M88TC6800_SPUR_GUARD_KHZ < window_khz;
+}
+
+/* Pick the ADC sampling clock, writing each candidate's selector as it is
+ * tried, and return the chosen rate in kHz. */
+static u32 m88tc6800_select_adc_clock(struct m88tc6800_priv *priv, u32 freq_khz)
+{
+	const struct m88tc6800_adc_clock *clocks;
+	int i;
+
+	if (priv->config.xtal == 24000)
+		clocks = m88tc6800_adc_clocks_24m;
+	else if (priv->config.xtal == 27000)
+		clocks = m88tc6800_adc_clocks_27m;
+	else
+		return 108000;
+
+	/* The preferred candidate's selector is written unconditionally. */
+	m88tc6800_write_reg(priv, 0x4e, 0x06);
+	m88tc6800_write_reg(priv, 0x4f, clocks[0].sel);
+
+	if (freq_khz == M88TC6800_CAL_FREQ_KHZ)
+		return 108000;
+
+	for (i = 0; ; i++) {
+		if (i > 0) {
+			m88tc6800_write_reg(priv, 0x4e, 0x06);
+			m88tc6800_write_reg(priv, 0x4f, clocks[i].sel);
+		}
+		if (clocks[i].spur_spacing_khz == 0 ||
+		    m88tc6800_adc_clock_is_clear(freq_khz, clocks[i].spur_spacing_khz))
+			break;
+	}
+
+	if (priv->config.xtal == 27000 && freq_khz == M88TC6800_CAL_FREQ_27M_KHZ) {
+		m88tc6800_write_reg(priv, 0x4e, 0x06);
+		m88tc6800_write_reg(priv, 0x4f, 0x04);
+	}
+
+	return clocks[i].fadc_khz;
+}
+
+void m88tc6800_set_dac(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_khz)
+{
+	u32 dac_khz = priv->config.dac;
+	u32 fadc_khz, fadc_hz;
+	u32 nco_quot, nco_rem, nco_inc;
+	u32 fc_code, fc_offset;
+	u32 resamp_num, resamp_quot, resamp_rem;
+	u8 flt_bit;
+
+	/* reg 0x22: anti-alias filter corner (bit 6/7, picked from the DAC
+	 * rate), output gain in bits [5:3], fixed low nibble. */
+	flt_bit = dac_khz < 4501 ? 0x40 : 0x80;
+	m88tc6800_write_reg(priv, 0x22, flt_bit + priv->config.dac_gain * 8 + 0x05);
+	m88tc6800_set_reg_bits(priv, 0x20, 0x3, 0x5, 0x6);
+
+	fadc_khz = m88tc6800_select_adc_clock(priv, freq_khz);
+	fadc_hz = fadc_khz * 1000;
+
+	/* regs 0xfa/0xfb: NCO phase increment, (f_dac / f_adc) * 2^16. Split
+	 * into quotient and remainder so the intermediate stays in 32 bits. */
+	nco_quot = (dac_khz * 512000) / fadc_hz;
+	nco_rem = (dac_khz * 512000) % fadc_hz;
+	nco_inc = (nco_quot * 32 + (nco_rem * 32) / fadc_hz) * 4;
+	m88tc6800_write_reg(priv, 0xfa, nco_inc >> 8);
+	m88tc6800_write_reg(priv, 0xfb, nco_inc);
+
+	/* regs 0xe2/0xe3: low-pass cutoff code -- half the channel bandwidth
+	 * less a 100 kHz margin, rescaled from the nominal 108 MHz ADC clock
+	 * to the one actually selected above. */
+	fc_code = ((bandwidth_khz / 2 - 100) * 108000) / fadc_khz;
+
+	/* regs 0xe0/0xe1 and 0xe4/0xe5: resampler step (4096 - fc) / fc in
+	 * 15-bit fixed point, as a quotient plus the division remainder. */
+	resamp_num = (0x1000 - fc_code) * 0x8000;
+	resamp_quot = resamp_num / fc_code;
+	resamp_rem = resamp_num % fc_code;
+
+	m88tc6800_write_reg(priv, 0xe0, (resamp_rem >> 8) & 0xf);
+	m88tc6800_write_reg(priv, 0xe1, resamp_rem);
+	m88tc6800_write_reg(priv, 0xe2, fc_code >> 8);
+	m88tc6800_write_reg(priv, 0xe3, fc_code);
+	m88tc6800_write_reg(priv, 0xe4, (resamp_quot & 0xffff) >> 8);
+	m88tc6800_write_reg(priv, 0xe5, resamp_quot);
+
+	m88tc6800_write_reg(priv, 0xef, 0x00);
+	m88tc6800_write_reg(priv, 0xf0, 0x00);
+	m88tc6800_write_reg(priv, 0xf1, 0x08);
+
+	/* regs 0xf3/0xf4: cutoff expressed as a signed offset from mid-scale. */
+	fc_offset = (fc_code << 15 >> 11) - 0x8000;
+	m88tc6800_write_reg(priv, 0xf2, 0x00);
+	m88tc6800_write_reg(priv, 0xf3, fc_offset >> 8);
+	m88tc6800_write_reg(priv, 0xf4, fc_offset);
 }
 
 void m88tc6800_set_tune(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz, u8 mixer_type, u32 wait_time_ms)
@@ -750,10 +738,8 @@ void m88tc6800_set_tune(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth
 void m88tc6800_set_poweron(struct m88tc6800_priv *priv, u32 bandwidth_hz)
 {
     u8 reg_data;
-    char cVar8;
-    byte local_34;
-    byte local_33;
-    uint8_t local_32;
+    int retries;
+    u8 cal_sub6, cal_sub8, cal_status;
 
     m88tc6800_set_reg_bits(priv, 0x3c, 0x1, 0x0, 0x0);
     m88tc6800_set_reg_bits(priv, 0x55, 0x1, 0x0, 0x0);
@@ -895,26 +881,32 @@ void m88tc6800_set_poweron(struct m88tc6800_priv *priv, u32 bandwidth_hz)
     m88tc6800_write_reg(priv, 0x54, 0x5a);
     m88tc6800_write_reg(priv, 0x53, 0x4);
     m88tc6800_write_reg(priv, 0x54, 0xc4);
-    cVar8 = '\x04';
+    /* Run the calibration, re-reading the result until it settles or four
+     * attempts have been spent. The two sub-register readbacks only have
+     * an upper bound -- the comparison in the original promotes to int, so
+     * anything at or below 0x2e passes -- while reg 0x50 has to land
+     * inside 0xc5..0xc8. */
+    retries = 4;
     do {
       m88tc6800_write_reg(priv, 0x53, 0x1);
       m88tc6800_write_reg(priv, 0x54, 0x0);
       m88tc6800_write_reg(priv, 0x53, 0x0);
       m88tc6800_write_reg(priv, 0x54, 0xff);
       m88tc6800_write_reg(priv, 0x53, 0x0);
-      cVar8 = cVar8 + -1;
+      retries--;
       m88tc6800_write_reg(priv, 0x54, 0x0);
       m88tc6800_expand_reg_bits(priv, 0x53, 0x2, 0x1, 0x6, 0x6);
       m88tc6800_expand_reg_bits(priv, 0x53, 0x2, 0x0, 0x6, 0x6);
       m88tc6800_write_reg(priv, 0x53, 0x1);
       m88tc6800_write_reg(priv, 0x54, 0x3a);
       m88tc6800_write_reg(priv, 0x53, 0x6);
-      m88tc6800_read_reg(priv, 0x54, &local_34);
+      m88tc6800_read_reg(priv, 0x54, &cal_sub6);
       m88tc6800_write_reg(priv, 0x53, 0x8);
-      m88tc6800_read_reg(priv, 0x54, &local_33);
-      m88tc6800_read_reg(priv, 0x50, &local_32);
-      if (((local_34 - 0x2c < 3) && (local_33 - 0x2c < 3)) && ((byte)(local_32 + 0x3b) < 4)) break;
-    } while (cVar8 != '\0');
+      m88tc6800_read_reg(priv, 0x54, &cal_sub8);
+      m88tc6800_read_reg(priv, 0x50, &cal_status);
+      if (cal_sub6 <= 0x2e && cal_sub8 <= 0x2e && (u8)(cal_status + 0x3b) < 4)
+        break;
+    } while (retries != 0);
     m88tc6800_write_reg(priv, 0x53, 0x1);
     m88tc6800_write_reg(priv, 0x54, 0x0);
     m88tc6800_write_reg(priv, 0x12, 0xe);
@@ -1012,22 +1004,33 @@ int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_
     m88tc6800_write_reg(priv, 0x0d, 0xc4);
     m88tc6800_write_reg(priv, 0x3d, 0xfe);
     {
-        u32 tmp1, tmp2, tmp3;
+        /* regs 0x4a/0x4b hold the 12-bit channel counter latched by the
+         * tuning above; reg 0x4c[6:5] is the range it was counted on and
+         * says how far to shift it down. */
+        u32 ccval_h, ccval_l, ccval, freq_ch_khz;
+
         m88tc6800_read_reg(priv, 0x4a, &reg_data);
-        tmp1 = reg_data;
+        ccval_h = reg_data;
         m88tc6800_read_reg(priv, 0x4b, &reg_data);
-        tmp2 = reg_data;
+        ccval_l = reg_data;
         m88tc6800_read_reg(priv, 0x4c, &reg_data);
-        tmp3 = (((tmp1 & 0xf) << 8) + tmp2) >> (((u32)reg_data << 25) >> 30);
-        if (priv->config.xtal == 27000) {
-            tmp3 = 1000 * (tmp3 * 216) / 24;
-        }
-        else {
-            tmp3 = 1000 * tmp3 * 8;
-        }
-        if ((tmp3 - freq_khz <= 20000) || (freq_khz - tmp3 <= 20000) || (tmp3 - 3 * freq_khz <= 20000) || (3 * freq_khz - tmp3 <= 20000)) {
+        ccval = (((ccval_h & 0xf) << 8) + ccval_l) >> ((reg_data >> 5) & 3);
+
+        /* The counter steps in thirds of the crystal frequency. */
+        if (priv->config.xtal == 27000)
+            freq_ch_khz = ccval * 9000;
+        else
+            freq_ch_khz = ccval * 8000;
+
+        /* If what was actually tuned sits within 20 MHz of the wanted
+         * channel, or of its third harmonic, enable the interference
+         * mitigation in reg 0x10. Each pair of subtractions is unsigned,
+         * so only the non-wrapping one can pass. */
+        if (freq_ch_khz - freq_khz <= 20000 ||
+                freq_khz - freq_ch_khz <= 20000 ||
+                freq_ch_khz - 3 * freq_khz <= 20000 ||
+                3 * freq_khz - freq_ch_khz <= 20000)
             m88tc6800_write_reg(priv, 0x10, 0x50);
-        }
     }
     m88tc6800_write_reg(priv, 0x66, 0x48);
     m88tc6800_write_reg(priv, 0xb0, 0x0b);
@@ -1102,150 +1105,80 @@ static uint32_t xm_list_dBm[] = {
     0x12C3,        0x12C6,        0x12CA,        0x12CD
 };
 
+/* Front-end gain reference per band, in units of 0.1 dB. Added to the gain
+ * setting read back from reg 0x63 to get the gain actually applied. */
+struct m88tc6800_gain_band {
+	u32 below_khz;
+	s32 gain_ref_x10;
+};
+
+static const struct m88tc6800_gain_band m88tc6800_gain_bands[] = {
+	{    110001, -315 },
+	{    200001, -300 },
+	{    334001, -280 },
+	{    400001, -340 },
+	{    600001, -320 },
+	{    700001, -305 },
+	{    800001, -300 },
+	{    900001, -310 },
+	{ 0xffffffff, -340 },
+};
+
+/* Read the RF level in dBm.
+ *
+ * reg 0xc8 is the power detector reading, which indexes xm_list_dBm[] to
+ * give a detected power in 0.01 dB. Subtracting the gain the front end is
+ * currently applying turns that into the level at the antenna. The gain is
+ * reconstructed from reg 0x63 plus three corrections: a per-band
+ * reference, the LNA/mixer configuration reported by reg 0x8b, and the
+ * four harmonic bands where m88tc6800_set_rf_frontend() leaves the front
+ * end detuned.
+ *
+ * Everything is carried in 0.1 dB units (the vendor's _x10 convention)
+ * until the final division.
+ */
 int m88tc6800_get_rf_power(struct m88tc6800_priv *priv, s32 *strength)
 {
-  uint32_t uVar1;
-  uint uVar2;
-  int iVar3;
-  int iVar4;
-  bool bVar5;
-  byte local_31 [5];
+	const struct m88tc6800_gain_band *band = m88tc6800_gain_bands;
+	u32 freq_khz = priv->frequency_hz / 1000;
+	s32 gain_x10, level;
+	u8 gain, front_end_cfg, power_det;
 
-                    /* Unresolved local var: uint32_t ret@[???]
-                       Unresolved local var: int32_t rfLevel@[???] */
-                    /* Unresolved local var: uint32_t ret@[???]
-                       Unresolved local var: char[22] __func__@[???] */
-                    /* Unresolved local var: uint32_t ret@[???]
-                       Unresolved local var: int32_t rflevel@[???]
-                       Unresolved local var: uint8_t buf@[???]
-                       Unresolved local var: uint8_t bufH@[???]
-                       Unresolved local var: uint8_t bufL@[???]
-                       Unresolved local var: int32_t level@[???]
-                       Unresolved local var: int32_t gain_x10@[???]
-                       Unresolved local var: int32_t gain_ref_x10@[???]
-                       Unresolved local var: int32_t pd_x10@[???]
-                       Unresolved local var: int32_t pdtref_x10@[???]
-                       Unresolved local var: uint32_t freq_KHz@[???]
-                       Unresolved local var: uint32_t[16][16] xm_list_dBm@[???] */
-  uint32_t freq_khz = priv->frequency_hz / 1000;
-  uVar1 = freq_khz;
-  if (freq_khz < 0x1adb1) {
-    m88tc6800_read_reg(priv, 0x63,local_31);
-    uVar2 = (uint)local_31[0];
-    m88tc6800_read_reg(priv, 0x8b,local_31);
-    iVar4 = uVar2 * 10 + -0x1d1;
-    iVar3 = uVar2 * 10 + -0x13b;
-    local_31[0] = local_31[0] & 0x77;
-LAB_0008e5cc:
-    if (local_31[0] == 0x55) {
-      iVar3 = iVar4 + 0x82;
-    }
-    else {
-joined_r0x0008e5dc:
-      if (local_31[0] == 0x11) {
-        if (uVar1 < 0xc3501) {
-          iVar3 = iVar3 + -0x28;
-        }
-        else {
-          iVar3 = iVar3 + -0x19;
-        }
-      }
-    }
-  }
-  else if (freq_khz < 0x30d41) {
-    m88tc6800_read_reg(priv, 0x63,local_31);
-    uVar2 = (uint)local_31[0];
-    iVar3 = uVar2 * 10 + -300;
-    m88tc6800_read_reg(priv, 0x8b,local_31);
-    local_31[0] = local_31[0] & 0x77;
-    if (local_31[0] != 0x55) goto joined_r0x0008e5dc;
-    iVar3 = uVar2 * 10 + -0x140;
-  }
-  else {
-    if (freq_khz < 0x518b1) {
-      iVar4 = -0x1ae;
-    }
-    else if (freq_khz < 0x61a81) {
-      iVar4 = -0x1ea;
-    }
-    else if (freq_khz < 0x927c1) {
-      iVar4 = -0x1d6;
-    }
-    else if (freq_khz < 0xaae61) {
-      iVar4 = -0x1c7;
-    }
-    else {
-      if (800000 < freq_khz) {
-        if (freq_khz < 0xdbba1) {
-          m88tc6800_read_reg(priv, 0x63,local_31);
-          uVar2 = (uint)local_31[0];
-          iVar4 = uVar2 * 10 + -0x1cc;
-          m88tc6800_read_reg(priv, 0x8b,local_31);
-          iVar3 = uVar2 * 10 + -0x136;
-          local_31[0] = local_31[0] & 0x77;
-          goto LAB_0008e5cc;
-        }
-        m88tc6800_read_reg(priv, 0x63,local_31);
-        iVar3 = (short)(ushort)local_31[0] * 10 + -0x154;
-        m88tc6800_read_reg(priv, 0x8b,local_31);
-        local_31[0] = local_31[0] & 0x77;
-        goto LAB_0008e4e4;
-      }
-      iVar4 = -0x1c2;
-    }
-    m88tc6800_read_reg(priv, 0x63,local_31);
-    iVar4 = (short)(ushort)local_31[0] * 10 + iVar4;
-    m88tc6800_read_reg(priv, 0x8b,local_31);
-    iVar3 = iVar4 + 0x96;
-    local_31[0] = local_31[0] & 0x77;
-    if (uVar1 < 0xdbba1) goto LAB_0008e5cc;
-  }
-LAB_0008e4e4:
-  if (7999 < uVar1 - 0x595b1) {
-    if (uVar1 - 480000 < 0x2ee1) goto LAB_0008e764;
-    if (14000 < uVar1 - 610000) {
-      if (20000 < uVar1 - 800000) goto LAB_0008e508;
-      goto LAB_0008e75c;
-    }
-  }
-  else if (65999 < uVar1 - 0x518b1) {
-    if (73999 < uVar1 - 0x61a81) {
-      if (((uVar1 - 0x73b91 < 0x1ec30) || (uVar1 - 0x927c1 < 200000)) || (uVar1 - 0xc3501 < 58000))
-      {
-        iVar3 = iVar3 + 0x41;
-        goto LAB_0008e508;
-      }
-      if (41999 < uVar1 - 0xd1791) {
-        if (uVar1 - 0xdbba1 < 120000) {
-          iVar3 = iVar3 + 0xf;
-        }
-        else {
-          bVar5 = uVar1 == 110000;
-          if (uVar1 < 0x1adb1) {
-            bVar5 = 0;
-          }
-          if (bVar5) {
-            iVar3 = iVar3 + -0x1e;
-          }
-        }
-        goto LAB_0008e508;
-      }
-LAB_0008e75c:
-      iVar3 = iVar3 + 10;
-      goto LAB_0008e508;
-    }
-LAB_0008e764:
-    iVar3 = iVar3 + 0x32;
-    goto LAB_0008e508;
-  }
-  iVar3 = iVar3 + 0x3c;
-LAB_0008e508:
-  m88tc6800_read_reg(priv, 0xc8,local_31);
-  iVar3 = (int)((xm_list_dBm[local_31[0]] / 10 - 0x1a9) - iVar3) / 10;
-  iVar4 = -0x6b;
-  if (-0x6c < iVar3) {
-    iVar4 = iVar3;
-  }
-  *strength = iVar4;
-  return 0;
+	while (freq_khz >= band->below_khz)
+		band++;
+
+	m88tc6800_read_reg(priv, 0x63, &gain);
+	m88tc6800_read_reg(priv, 0x8b, &front_end_cfg);
+	front_end_cfg &= 0x77;
+
+	gain_x10 = gain * 10 + band->gain_ref_x10;
+
+	/* reg 0x8b holds the LNA/mixer drive set by m88tc6800_set_rf_frontend():
+	 * 0x55 below 602 MHz, 0x11 above it. Above 900 MHz no correction is
+	 * applied at all. */
+	if (freq_khz < 900001) {
+		if (front_end_cfg == 0x55)
+			gain_x10 -= 20;
+		else if (front_end_cfg == 0x11)
+			gain_x10 -= freq_khz < 800001 ? 40 : 25;
+	}
+
+	/* The bands where the harmonic mixer is selected and reg 0x94 is
+	 * retuned -- see m88tc6800_get_mixer_type(). */
+	if (freq_khz >= 480000 && freq_khz <= 492000)
+		gain_x10 += 50;
+	else if (freq_khz >= 610000 && freq_khz <= 624000)
+		gain_x10 += 60;
+	else if (freq_khz >= 800000 && freq_khz <= 820000)
+		gain_x10 += 10;
+	else if (freq_khz >= 366001 && freq_khz <= 374000)
+		gain_x10 += 60;
+
+	m88tc6800_read_reg(priv, 0xc8, &power_det);
+
+	/* xm_list_dBm[] is in 0.01 dB, 0x1a9 is the detector reference. */
+	level = (s32)(xm_list_dBm[power_det] / 10 - 0x1a9 - (u32)gain_x10) / 10;
+
+	*strength = level < -107 ? -107 : level;
+	return 0;
 }

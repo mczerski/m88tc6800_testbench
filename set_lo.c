@@ -3,13 +3,13 @@
 #include "new.h"
 
 static int check_derived(uint32_t freq, uint8_t mixer_type) {
-    if (TC6800_tuner_cfg_cxd2856.tuner_int_ldiv != priv.ldiv) {
-        printf("ldiv: actual %02x, expected %02x\n", priv.ldiv, TC6800_tuner_cfg_cxd2856.tuner_int_ldiv);
+    if (TC6800_tuner_cfg_cxd2856.tuner_int_ldiv != priv.lo_div) {
+        printf("lo_div: actual %02x, expected %02x\n", priv.lo_div, TC6800_tuner_cfg_cxd2856.tuner_int_ldiv);
         printf("%s", msg);
         return -1;
     }
-    if (TC6800_tuner_cfg_cxd2856.tuner_int_fvco_tg != priv.fvco_tg) {
-        printf("fvco_tg: actual %02x, expected %02x\n", priv.fvco_tg, TC6800_tuner_cfg_cxd2856.tuner_int_fvco_tg);
+    if (TC6800_tuner_cfg_cxd2856.tuner_int_fvco_tg != priv.fvco_target) {
+        printf("fvco_target: actual %02x, expected %02x\n", priv.fvco_target, TC6800_tuner_cfg_cxd2856.tuner_int_fvco_tg);
         printf("%s", msg);
         return -1;
     }
