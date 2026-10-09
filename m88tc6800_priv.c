@@ -18,35 +18,6 @@ int m88tc6800_set_reg_bits(struct m88tc6800_priv *priv, u8 reg, u8 val, u8 begin
   return ret;
 }
 
-/* Read-modify-write a bit field of an indexed sub-register.
- *
- * The chip has two indexed register banks: write a sub-register index to
- * the index register (0x4e or 0x53), then access that sub-register through
- * the data register immediately following it (0x4f or 0x54). The index is
- * re-written before the data write because the read in between leaves the
- * bank pointing elsewhere on real hardware.
- *
- * Unlike m88tc6800_set_reg_bits() the two bit positions may be given in
- * either order; the field is always bits [high..low] of the data register.
- */
-u32 m88tc6800_expand_reg_bits(struct m88tc6800_priv *priv, u8 index_reg, u8 index,
-                              u8 val, u8 start_bit, u8 end_bit)
-{
-    u8 high_bit = start_bit > end_bit ? start_bit : end_bit;
-    u8 low_bit = start_bit > end_bit ? end_bit : start_bit;
-    u8 val_mask = ((1 << (high_bit - low_bit + 1)) - 1) << low_bit;
-    u8 reg_data;
-
-    m88tc6800_write_reg(priv, index_reg, index);
-    m88tc6800_read_reg(priv, index_reg + 1, &reg_data);
-
-    reg_data = (reg_data & ~val_mask) | ((val << low_bit) & val_mask);
-
-    m88tc6800_write_reg(priv, index_reg, index);
-    m88tc6800_write_reg(priv, index_reg + 1, reg_data);
-    return 0;
-}
-
 void m88tc6800_preset(struct m88tc6800_priv *priv)
 {
     u8 reg_data;
@@ -558,8 +529,8 @@ void m88tc6800_set_bandwidth(struct m88tc6800_priv *priv, u32 bandwidth_hz)
     }
 }
 
-/* Channels used by m88tc6800_set_poweron() for calibration. The ADC spur
- * search is skipped entirely for the first one. */
+/* Calibration channels. The ADC spur search is skipped entirely for the
+ * first one. */
 #define M88TC6800_CAL_FREQ_KHZ		997375
 #define M88TC6800_CAL_FREQ_27M_KHZ	498377
 
@@ -707,238 +678,6 @@ void m88tc6800_set_dac(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_
 	m88tc6800_write_reg(priv, 0xf4, fc_offset);
 }
 
-void m88tc6800_set_tune(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz, u8 mixer_type, u32 wait_time_ms)
-{
-  m88tc6800_write_reg(priv, 0x04, 0x7f);
-  m88tc6800_write_reg(priv, 0x05, 0xf8);
-  m88tc6800_preset(priv);
-  m88tc6800_set_rf_frontend(priv, freq_khz);
-  m88tc6800_set_mixer(priv, freq_khz, 1);
-  m88tc6800_set_lo(priv, freq_khz, 1);
-  m88tc6800_set_pll(priv);
-  m88tc6800_set_bandwidth(priv, bandwidth_hz);
-  m88tc6800_write_reg(priv, 0x04, 0x00);
-  m88tc6800_write_reg(priv, 0x05, 0x00);
-  m88tc6800_set_dac(priv, freq_khz, bandwidth_hz);
-  m88tc6800_write_reg(priv, 0x40, 0x1a);
-  m88tc6800_write_reg(priv, 0x41, 0x00);
-  m88tc6800_write_reg(priv, 0x44, 0x22);
-  m88tc6800_write_reg(priv, 0x60, 0x34);
-  m88tc6800_write_reg(priv, 0x05, 0x04);
-  m88tc6800_write_reg(priv, 0xc2, 0x01);
-  m88tc6800_write_reg(priv, 0x00, 0x01);
-  m88tc6800_write_reg(priv, 0x00, 0x00);
-  m88tc6800_write_reg(priv, 0xc2, 0x00);
-  m88tc6800_write_reg(priv, 0x05, 0x00);
-  m88tc6800_write_reg(priv, 0x39, 0x00);
-  m88tc6800_write_reg(priv, 0x3a, 0x00);
-  msleep(wait_time_ms);
-}
-
-void m88tc6800_set_poweron(struct m88tc6800_priv *priv, u32 bandwidth_hz)
-{
-    u8 reg_data;
-    int retries;
-    u8 cal_sub6, cal_sub8, cal_status;
-
-    m88tc6800_set_reg_bits(priv, 0x3c, 0x1, 0x0, 0x0);
-    m88tc6800_set_reg_bits(priv, 0x55, 0x1, 0x0, 0x0);
-    m88tc6800_write_reg(priv, 0x16, 0x80);
-    m88tc6800_write_reg(priv, 0x17, 0xf3);
-    if (priv->config.xtal_cap != 0x18) {
-      m88tc6800_write_reg(priv, 0x1a, 0x4);
-      m88tc6800_write_reg(priv, 0x1b, priv->config.xtal_cap);
-      m88tc6800_write_reg(priv, 0x1a, 0x5);
-      m88tc6800_write_reg(priv, 0x1b, priv->config.xtal_cap);
-    }
-    m88tc6800_write_reg(priv, 0xe, 0xa4);
-    m88tc6800_write_reg(priv, 0x3, 0x0);
-    m88tc6800_write_reg(priv, 0x4e, 0x2);
-    m88tc6800_write_reg(priv, 0x4f, 0xe9);
-    m88tc6800_write_reg(priv, 0x68, 0xf);
-    m88tc6800_write_reg(priv, 0x69, 0xf1);
-    m88tc6800_write_reg(priv, 0x76, 0x30);
-    m88tc6800_write_reg(priv, 0x78, 0x25);
-    m88tc6800_write_reg(priv, 0x79, 0x1f);
-    m88tc6800_write_reg(priv, 0x7b, 0x0);
-    m88tc6800_write_reg(priv, 0xb1, 0x2a);
-    m88tc6800_write_reg(priv, 0xb2, 0xb2);
-    m88tc6800_write_reg(priv, 0xb3, 0x54);
-    m88tc6800_write_reg(priv, 0xb4, 0x6e);
-    m88tc6800_write_reg(priv, 0xb5, 0x2a);
-    m88tc6800_write_reg(priv, 0xb6, 0xb2);
-    m88tc6800_write_reg(priv, 0xba, 0x90);
-    m88tc6800_write_reg(priv, 0x27, 0xb4);
-    m88tc6800_write_reg(priv, 0x25, 0x2a);
-    m88tc6800_write_reg(priv, 0x84, 0x20);
-    m88tc6800_set_reg_bits(priv, 0xfc, 0x1, 0x5, 0x5);
-    m88tc6800_set_reg_bits(priv, 0x2a, 0x1, 0x0, 0x1);
-    m88tc6800_set_reg_bits(priv, 0xa7, 0x0, 0x0, 0x2);
-    m88tc6800_write_reg(priv, 0x2c, 0xa);
-    m88tc6800_write_reg(priv, 0xc7, 0x2);
-    m88tc6800_write_reg(priv, 0x5, 0x4);
-    m88tc6800_write_reg(priv, 0xc6, 0x80);
-    m88tc6800_write_reg(priv, 0x5, 0x0);
-    m88tc6800_write_reg(priv, 0xad, 0xa);
-    m88tc6800_write_reg(priv, 0xfd, 0x1a);
-    m88tc6800_write_reg(priv, 0x5, 0x4);
-    m88tc6800_write_reg(priv, 0xc7, 0x0);
-    m88tc6800_write_reg(priv, 0x5, 0x0);
-    m88tc6800_write_reg(priv, 0x39, 0x5);
-    m88tc6800_write_reg(priv, 0x3a, 0x3f);
-    m88tc6800_write_reg(priv, 0x39, 0x6);
-    m88tc6800_write_reg(priv, 0x3a, 0x3);
-    m88tc6800_write_reg(priv, 0x39, 0x7);
-    m88tc6800_write_reg(priv, 0x3a, 0xd);
-    m88tc6800_write_reg(priv, 0x39, 0x8);
-    m88tc6800_write_reg(priv, 0x3a, 0x9);
-    m88tc6800_write_reg(priv, 0x39, 0x9);
-    m88tc6800_write_reg(priv, 0x3a, 0x0);
-    m88tc6800_write_reg(priv, 0x39, 0xa);
-    m88tc6800_write_reg(priv, 0x3a, 0x0);
-    m88tc6800_write_reg(priv, 0x39, 0xb);
-    m88tc6800_write_reg(priv, 0x3a, 0x1);
-    m88tc6800_write_reg(priv, 0x39, 0xc);
-    m88tc6800_write_reg(priv, 0x3a, 0x0);
-    m88tc6800_write_reg(priv, 0x39, 0xd);
-    m88tc6800_write_reg(priv, 0x3a, 0x7f);
-    m88tc6800_write_reg(priv, 0x39, 0x1a);
-    m88tc6800_write_reg(priv, 0x3a, 0x8);
-    m88tc6800_write_reg(priv, 0x39, 0x1b);
-    m88tc6800_write_reg(priv, 0x3a, 0xd);
-    m88tc6800_write_reg(priv, 0x39, 0xe);
-    m88tc6800_write_reg(priv, 0x3a, 0x4);
-    m88tc6800_write_reg(priv, 0x39, 0xf);
-    m88tc6800_write_reg(priv, 0x3a, 0x4);
-    m88tc6800_write_reg(priv, 0x39, 0x10);
-    m88tc6800_write_reg(priv, 0x3a, 0x1);
-    m88tc6800_write_reg(priv, 0x4e, 0x2b);
-    m88tc6800_write_reg(priv, 0x4f, 0xa);
-    m88tc6800_write_reg(priv, 0x4e, 0x2c);
-    m88tc6800_write_reg(priv, 0x4f, 0x10);
-    m88tc6800_write_reg(priv, 0x4e, 0x2f);
-    m88tc6800_write_reg(priv, 0x4f, 0x1);
-    m88tc6800_write_reg(priv, 0x4e, 0x29);
-    m88tc6800_write_reg(priv, 0x4f, 0xcc);
-    m88tc6800_write_reg(priv, 0x7c, 0x10);
-    m88tc6800_set_reg_bits(priv, 0x35, 0x0, 0x4, 0x7);
-    m88tc6800_set_reg_bits(priv, 0x37, 0x6, 0x0, 0x2);
-    m88tc6800_set_reg_bits(priv, 0xbd, 0x1, 0x7, 0x7);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x40);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x41);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x42);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x4a);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x52);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x5a);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0x62);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0xa2);
-    m88tc6800_write_reg(priv, 0xb8, 0x0);
-    m88tc6800_write_reg(priv, 0xbe, 0xe2);
-    m88tc6800_write_reg(priv, 0xb8, 0x1);
-    m88tc6800_write_reg(priv, 0xbe, 0x22);
-    m88tc6800_write_reg(priv, 0xb8, 0x1);
-    m88tc6800_write_reg(priv, 0xbe, 0x62);
-    m88tc6800_write_reg(priv, 0xb8, 0x3);
-    m88tc6800_write_reg(priv, 0xbe, 0x62);
-    m88tc6800_write_reg(priv, 0xb8, 0x5);
-    m88tc6800_write_reg(priv, 0xbe, 0x62);
-    m88tc6800_write_reg(priv, 0xb8, 0x5);
-    m88tc6800_write_reg(priv, 0xbe, 0xa2);
-    m88tc6800_write_reg(priv, 0xb8, 0x7);
-    m88tc6800_write_reg(priv, 0xbe, 0xa2);
-    m88tc6800_write_reg(priv, 0xb8, 0x7);
-    m88tc6800_write_reg(priv, 0xbe, 0xaa);
-    m88tc6800_write_reg(priv, 0xb8, 0x7);
-    m88tc6800_write_reg(priv, 0xbe, 0xb2);
-    m88tc6800_write_reg(priv, 0xb8, 0x7);
-    m88tc6800_write_reg(priv, 0xbe, 0xb3);
-    m88tc6800_write_reg(priv, 0xa0, 0xc);
-    m88tc6800_write_reg(priv, 0x39, 0x6a);
-    m88tc6800_write_reg(priv, 0x3a, 0x3f);
-    m88tc6800_set_reg_bits(priv, 0x1d, 0x0, 0x1, 0x1);
-    m88tc6800_write_reg(priv, 0x4e, 0x5);
-    m88tc6800_write_reg(priv, 0x4f, 0xc0);
-    m88tc6800_write_reg(priv, 0x4e, 0x5);
-    m88tc6800_write_reg(priv, 0x4f, 0x80);
-    m88tc6800_write_reg(priv, 0x45, 0x5d);
-    m88tc6800_set_tune(priv, 0xf37ff, bandwidth_hz, 0x32, 1);
-    m88tc6800_write_reg(priv, 0x14, 0x7b);
-    m88tc6800_write_reg(priv, 0x12, 0x1e);
-    m88tc6800_set_reg_bits(priv, 0xbd, 0x1, 0x4, 0x4);
-    m88tc6800_set_reg_bits(priv, 0xbc, 0x3, 0x6, 0x7);
-    m88tc6800_expand_reg_bits(priv, 0x53, 0xa, 0x0, 0x7, 0x7);
-    m88tc6800_expand_reg_bits(priv, 0x53, 0xd, 0x0, 0x7, 0x7);
-    m88tc6800_expand_reg_bits(priv, 0x53, 0x14, 0x1, 0x6, 0x6);
-    m88tc6800_write_reg(priv, 0x53, 0x3);
-    m88tc6800_write_reg(priv, 0x54, 0x5a);
-    m88tc6800_write_reg(priv, 0x53, 0x4);
-    m88tc6800_write_reg(priv, 0x54, 0xc4);
-    /* Run the calibration, re-reading the result until it settles or four
-     * attempts have been spent. The two sub-register readbacks only have
-     * an upper bound -- the comparison in the original promotes to int, so
-     * anything at or below 0x2e passes -- while reg 0x50 has to land
-     * inside 0xc5..0xc8. */
-    retries = 4;
-    do {
-      m88tc6800_write_reg(priv, 0x53, 0x1);
-      m88tc6800_write_reg(priv, 0x54, 0x0);
-      m88tc6800_write_reg(priv, 0x53, 0x0);
-      m88tc6800_write_reg(priv, 0x54, 0xff);
-      m88tc6800_write_reg(priv, 0x53, 0x0);
-      retries--;
-      m88tc6800_write_reg(priv, 0x54, 0x0);
-      m88tc6800_expand_reg_bits(priv, 0x53, 0x2, 0x1, 0x6, 0x6);
-      m88tc6800_expand_reg_bits(priv, 0x53, 0x2, 0x0, 0x6, 0x6);
-      m88tc6800_write_reg(priv, 0x53, 0x1);
-      m88tc6800_write_reg(priv, 0x54, 0x3a);
-      m88tc6800_write_reg(priv, 0x53, 0x6);
-      m88tc6800_read_reg(priv, 0x54, &cal_sub6);
-      m88tc6800_write_reg(priv, 0x53, 0x8);
-      m88tc6800_read_reg(priv, 0x54, &cal_sub8);
-      m88tc6800_read_reg(priv, 0x50, &cal_status);
-      if (cal_sub6 <= 0x2e && cal_sub8 <= 0x2e && (u8)(cal_status + 0x3b) < 4)
-        break;
-    } while (retries != 0);
-    m88tc6800_write_reg(priv, 0x53, 0x1);
-    m88tc6800_write_reg(priv, 0x54, 0x0);
-    m88tc6800_write_reg(priv, 0x12, 0xe);
-    m88tc6800_set_reg_bits(priv, 0xbd, 0x0, 0x4, 0x4);
-    m88tc6800_write_reg(priv, 0x53, 0xa);
-    m88tc6800_write_reg(priv, 0x54, 0x80);
-    m88tc6800_write_reg(priv, 0x53, 0xb);
-    m88tc6800_write_reg(priv, 0x54, 0x0);
-    m88tc6800_write_reg(priv, 0x53, 0xc);
-    m88tc6800_write_reg(priv, 0x54, 0x0);
-    m88tc6800_write_reg(priv, 0x53, 0xd);
-    m88tc6800_write_reg(priv, 0x54, 0x80);
-    m88tc6800_write_reg(priv, 0x53, 0xe);
-    m88tc6800_write_reg(priv, 0x54, 0x0);
-    m88tc6800_write_reg(priv, 0x53, 0xf);
-    m88tc6800_write_reg(priv, 0x54, 0x0);
-    if (priv->config.xtal == 24000) {
-      m88tc6800_set_reg_bits(priv, 0x5b, 0x2, 0x3, 0x5);
-    }
-    else if (priv->config.xtal == 27000) {
-      m88tc6800_set_reg_bits(priv, 0x5b, 0x6, 0x3, 0x5);
-      m88tc6800_expand_reg_bits(priv, 0x4e, 0x8, 0x1, 0x7, 0x7);
-      m88tc6800_set_tune(priv, 0x79ac9, bandwidth_hz, 0x32, 1);
-      m88tc6800_write_reg(priv, 0x39, 0x77);
-      m88tc6800_read_reg(priv, 0x3a, &reg_data);
-      m88tc6800_write_reg(priv, 0x39, 0x77);
-      m88tc6800_write_reg(priv, 0x3a, (reg_data & 0x3f) | 0x40);
-    }
-    m88tc6800_write_reg(priv, 0x45, 0x5d);
-    m88tc6800_set_reg_bits(priv, 0x3c, 0x1, 0x7, 0x7);
-}
-
 int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_hz)
 {
     u8 reg_data;
@@ -963,13 +702,7 @@ int m88tc6800_set_freq(struct m88tc6800_priv *priv, u32 freq_khz, u32 bandwidth_
     }
 
     m88tc6800_read_reg(priv, 0x3c, &reg_data);
-    reg_data &= 0x80;
-    if (reg_data == 0) {
-        m88tc6800_set_poweron(priv, bandwidth_hz);
-    }
-    else {
-        m88tc6800_write_reg(priv, 0x45, 0x5d);
-    }
+    m88tc6800_write_reg(priv, 0x45, 0x5d);
     m88tc6800_write_reg(priv, 0x04, 0x7f);
     m88tc6800_write_reg(priv, 0x05, 0xd8);
     m88tc6800_preset(priv);
